@@ -1,3 +1,4 @@
+import random
 from dataclasses import dataclass
 from enum import Enum, auto
 
@@ -27,9 +28,9 @@ class Runner:
     def simulate(self):
         for inputs, outputs in self.dataset:
             action = self.agent.act(inputs, outputs.format)
-            # if random.random() < 0.1:
-            #     print("inputs:", inputs.data[0].value, inputs.data[1].value, inputs.data[2].value)
-            #     print("outputs/pred:", outputs.data[0].value, action.data[0].value)
+            if random.random() < 0.01:
+                print("inputs:", inputs.data[0].value, inputs.data[1].value, inputs.data[2].value)
+                print("outputs/pred:", outputs.data[0].value, action.data[0].value)
             score = self.evaluate(action, outputs)
             yield inputs, outputs, action, score
 
@@ -61,7 +62,7 @@ class Runner:
 def main():
     embedding_size = 1
     knowledge_factory = KnowledgeFactory(coder=KnowledgeCoder(embedding_size), capacity=1000)
-    model_factory = MlModelFactory(batch_size=100)
+    model_factory = MlModelFactory(batch_size=32)
     runner = Runner(
         dataset=Dataset(
             batch_size=32,
@@ -74,7 +75,7 @@ def main():
             model_factory=model_factory,
             knowledge_factory=knowledge_factory,
             embedding_size=embedding_size,
-            batch_size=100,
+            batch_size=32,
         ),
         max_iterations=100,
         train_mode=TrainMode.FEEDBACK,

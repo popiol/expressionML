@@ -113,14 +113,14 @@ class Agent:
         return self.knowledge_factory.from_numpy(outputs, expected_format)
 
     def acknowledge_feedback(self, inputs: Knowledge, action: Knowledge, score: float) -> None:
-        print("score:", score)
         self.train_counter += 1
         if len(self.best_training_samples) < self.batch_size:
             heapq.heappush(self.best_training_samples, (score, inputs, action))
         elif score > self.best_training_samples[0][0]:
             heapq.heappop(self.best_training_samples)
             heapq.heappush(self.best_training_samples, (score, inputs, action))
-        if len(self.best_training_samples) >= self.batch_size and self.train_counter % (2 * self.batch_size) == 0:
+        if len(self.best_training_samples) >= self.batch_size and self.train_counter == 2 * self.batch_size:
+            self.train_counter = 0
             print("worst score:", self.best_training_samples[0][0])
             combined_model = self.get_combined_model(inputs.format, action.format)
             combined_model.train_batch(
