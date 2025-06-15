@@ -6,7 +6,6 @@ import numpy as np
 
 Descriptive = str | int | float
 FLOAT_TYPE = np.float32
-EMBEDDING_SIZE = 64
 
 
 @dataclass
@@ -21,24 +20,24 @@ class Embedding:
         return np.array(self.data, dtype=FLOAT_TYPE)
 
 
+@dataclass
 class KnowledgeCoder:
+    embedding_size: int
+
     def encode(self, value: Descriptive) -> Embedding:
         if isinstance(value, str):
-            return Embedding(tuple(float(ord(c)) for c in value))
+            return Embedding(tuple(ord(c) for c in value.ljust(self.embedding_size)[: self.embedding_size]))
         elif isinstance(value, (int, float)):
-            return Embedding((float(value),))
-        else:
-            raise ValueError(f"Unsupported type for encoding: {type(value)}")
+            return Embedding(tuple([float(value)] + [0.0] * (self.embedding_size - 1)))
 
     def decode(self, embedding: Embedding, output_type: type[Descriptive]) -> Descriptive:
-        if output_type == str:
+        if output_type is str:
             return "".join(chr(int(c)) for c in embedding.data)
-        elif output_type == int:
+        elif output_type is int:
             return int(embedding.data[0])
-        elif output_type == float:
+        elif output_type is float:
             return float(embedding.data[0])
-        else:
-            raise ValueError(f"Unsupported type for decoding: {output_type}")
+        raise ValueError(f"Unsupported type for decoding: {output_type}")
 
 
 @dataclass
@@ -72,10 +71,8 @@ class AtomicKnowledge:
 @dataclass
 class Knowledge:
     data: list[AtomicKnowledge]
-
-    @staticmethod
-    def empty() -> Knowledge:
-        return Knowledge(data=[])
+    capacity: int
+    """The maximum number of atomic knowledge entries allowed in this knowledge base."""
 
     @property
     def format(self):
@@ -103,7 +100,7 @@ class Knowledge:
         )
 
     def to_numpy(self) -> np.ndarray:
-        return np.array([ak.encoded_value for ak in self.data], dtype=FLOAT_TYPE)
+        return np.concatenate([ak.encoded_value.to_numpy() for ak in self.data])
 
     def add(self, atomic_knowledge: AtomicKnowledge) -> None:
         self.data.append(atomic_knowledge)
@@ -112,10 +109,11 @@ class Knowledge:
 @dataclass
 class KnowledgeFactory:
     coder: KnowledgeCoder
+    capacity: int
 
     def from_list(self, values: list[Descriptive]) -> Knowledge:
         return Knowledge(
-            [
+            data=[
                 AtomicKnowledge(
                     key=index,
                     value=value,
@@ -123,11 +121,18 @@ class KnowledgeFactory:
                     encoded_value=self.coder.encode(value),
                 )
                 for index, value in enumerate(values)
-            ]
+            ],
+            capacity=self.capacity,
+        )
+
+    def empty(self) -> Knowledge:
+        return Knowledge(
+            data=[],
+            capacity=self.capacity,
         )
 
     def from_numpy(self, values: np.ndarray, expected_format: KnowledgeFormat) -> Knowledge:
-        knowledge = Knowledge.empty()
+        knowledge = self.empty()
         offset = 0
         for af in expected_format.format:
             value = values[offset : offset + af.encoded_value_length]

@@ -1,7 +1,7 @@
 import random
 from dataclasses import dataclass
 
-from knowledge import KnowledgeFactory
+from src.knowledge import KnowledgeFactory
 
 
 @dataclass
@@ -13,7 +13,16 @@ class Dataset:
         for _ in range(self.batch_size):
             x = random.random()
             y = random.random()
+            operation = random.randrange(2)
+            if operation == 0:
+                result = x + y
+            elif operation == 1:
+                result = x - y
+            elif operation == 2:
+                result = x * y
+            elif operation == 3:
+                result = x / y
             yield (
-                self.knowledge_factory.from_list([x, y]),
-                self.knowledge_factory.from_list([x + y, x - y, x * y, x / y]),
+                self.knowledge_factory.from_list([x, y, operation]),
+                self.knowledge_factory.from_list([result]),
             )

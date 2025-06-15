@@ -5,6 +5,8 @@ from src.agent import Agent
 from src.dataset import Dataset
 from src.knowledge import Knowledge, KnowledgeCoder, KnowledgeFactory
 from src.ml_model import MlModelFactory
+from src.stats import Stats
+from src.utils import timer
 
 
 class TrainMode(Enum):
@@ -20,15 +22,19 @@ class Runner:
     train_mode: TrainMode
 
     def evaluate(self, action: Knowledge, outputs: Knowledge):
-        return action.distance_to(outputs)
+        return -action.distance_to(outputs)
 
     def simulate(self):
         for inputs, outputs in self.dataset:
             action = self.agent.act(inputs, outputs.format)
+            # if random.random() < 0.1:
+            #     print("inputs:", inputs.data[0].value, inputs.data[1].value, inputs.data[2].value)
+            #     print("outputs/pred:", outputs.data[0].value, action.data[0].value)
             score = self.evaluate(action, outputs)
             yield inputs, outputs, action, score
 
     def train(self):
+        print("train")
         self.agent.set_training_mode()
         for inputs, outputs, action, score in self.simulate():
             if self.train_mode == TrainMode.GROUND_TRUTH:
@@ -39,9 +45,12 @@ class Runner:
                 raise ValueError(f"Unknown train mode: {self.train_mode}")
 
     def test(self):
+        print("test")
         self.agent.set_evaluation_mode()
+        score_stats = Stats()
         for inputs, outputs, action, score in self.simulate():
-            print("Score:", score)
+            score_stats.add_single_value(score)
+        print(f"Test score: {score_stats.mean}, {score_stats.min}")
 
     def run(self):
         for _ in range(self.max_iterations):
@@ -49,12 +58,14 @@ class Runner:
             self.test()
 
 
-if __name__ == "__main__":
-    knowledge_factory = KnowledgeFactory(coder=KnowledgeCoder())
-    model_factory = MlModelFactory()
+def main():
+    embedding_size = 1
+    batch_size = 32
+    knowledge_factory = KnowledgeFactory(coder=KnowledgeCoder(embedding_size), capacity=1000)
+    model_factory = MlModelFactory(batch_size=batch_size)
     runner = Runner(
         dataset=Dataset(
-            batch_size=32,
+            batch_size=batch_size,
             knowledge_factory=knowledge_factory,
         ),
         agent=Agent.init(
@@ -63,8 +74,14 @@ if __name__ == "__main__":
             use_memory=False,
             model_factory=model_factory,
             knowledge_factory=knowledge_factory,
+            embedding_size=embedding_size,
         ),
-        max_iterations=100,
-        train_mode=TrainMode.FEEDBACK,
+        max_iterations=10,
+        train_mode=TrainMode.GROUND_TRUTH,
     )
     runner.run()
+
+
+if __name__ == "__main__":
+    with timer("Overall"):
+        main()
