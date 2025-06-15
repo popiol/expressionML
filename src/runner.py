@@ -60,12 +60,11 @@ class Runner:
 
 def main():
     embedding_size = 1
-    batch_size = 32
     knowledge_factory = KnowledgeFactory(coder=KnowledgeCoder(embedding_size), capacity=1000)
-    model_factory = MlModelFactory(batch_size=batch_size)
+    model_factory = MlModelFactory(batch_size=100)
     runner = Runner(
         dataset=Dataset(
-            batch_size=batch_size,
+            batch_size=32,
             knowledge_factory=knowledge_factory,
         ),
         agent=Agent.init(
@@ -75,9 +74,10 @@ def main():
             model_factory=model_factory,
             knowledge_factory=knowledge_factory,
             embedding_size=embedding_size,
+            batch_size=100,
         ),
-        max_iterations=10,
-        train_mode=TrainMode.GROUND_TRUTH,
+        max_iterations=100,
+        train_mode=TrainMode.FEEDBACK,
     )
     runner.run()
 

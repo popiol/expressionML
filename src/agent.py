@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import heapq
 from dataclasses import dataclass
-from src.utils import timer
+
 import numpy as np
-from src.keras import tf
+
 from src.knowledge import Knowledge, KnowledgeFactory, KnowledgeFormat
 from src.ml_model import MlModel, MlModelFactory
 from src.stats import Stats
@@ -19,6 +20,9 @@ class Agent:
     combined_models: dict[tuple[KnowledgeFormat, KnowledgeFormat], MlModel]
     knowledge_factory: KnowledgeFactory
     embedding_size: int
+    best_training_samples: list[tuple[float, Knowledge, Knowledge]]
+    batch_size: int
+    train_counter: int = 0
     score_stats: Stats = Stats()
     global_knowledge: Knowledge | None = None
     memory: Knowledge | None = None
@@ -31,6 +35,7 @@ class Agent:
         model_factory: MlModelFactory,
         knowledge_factory: KnowledgeFactory,
         embedding_size: int,
+        batch_size: int,
     ) -> Agent:
         return Agent(
             model_version=model_version,
@@ -47,13 +52,14 @@ class Agent:
             embedding_size=embedding_size,
             global_knowledge=global_knowledge,
             memory=knowledge_factory.empty() if use_memory else None,
+            best_training_samples=[],
+            batch_size=batch_size,
         )
 
     def get_input_model(self, input_format: KnowledgeFormat) -> MlModel:
         self.input_models[input_format] = self.input_models.get(
             input_format,
-    
-           self.model_factory.get_model(
+            self.model_factory.get_model(
                 version=self.model_version,
                 input_size=input_format.size,
                 output_size=self.embedding_size,
@@ -71,7 +77,7 @@ class Agent:
             ),
         )
         return self.output_models[output_format]
-    
+
     def get_input_models(self, input_format: KnowledgeFormat) -> list[MlModel]:
         models = []
         models.append(self.get_input_model(input_format))
@@ -94,18 +100,12 @@ class Agent:
         return self.combined_models[key]
 
     def set_training_mode(self):
-        for model in self.input_models.values():
+        for model in self.combined_models.values():
             model.set_training_mode()
-        for model in self.output_models.values():
-            model.set_training_mode()
-        self.inner_model.set_training_mode()
 
     def set_evaluation_mode(self):
-        for model in self.input_models.values():
+        for model in self.combined_models.values():
             model.set_evaluation_mode()
-        for model in self.output_models.values():
-            model.set_evaluation_mode()
-        self.inner_model.set_evaluation_mode()
 
     def act(self, inputs: Knowledge, expected_format: KnowledgeFormat) -> Knowledge:
         combined_model = self.get_combined_model(inputs.format, expected_format)
@@ -113,10 +113,20 @@ class Agent:
         return self.knowledge_factory.from_numpy(outputs, expected_format)
 
     def acknowledge_feedback(self, inputs: Knowledge, action: Knowledge, score: float) -> None:
-        self.score_stats.add_single_value(score)
-        if score > self.score_stats.mean + self.score_stats.std:
+        print("score:", score)
+        self.train_counter += 1
+        if len(self.best_training_samples) < self.batch_size:
+            heapq.heappush(self.best_training_samples, (score, inputs, action))
+        elif score > self.best_training_samples[0][0]:
+            heapq.heappop(self.best_training_samples)
+            heapq.heappush(self.best_training_samples, (score, inputs, action))
+        if len(self.best_training_samples) >= self.batch_size and self.train_counter % (2 * self.batch_size) == 0:
+            print("worst score:", self.best_training_samples[0][0])
             combined_model = self.get_combined_model(inputs.format, action.format)
-            combined_model.train(inputs.to_numpy(), action.to_numpy())
+            combined_model.train_batch(
+                np.array([x[1].to_numpy() for x in self.best_training_samples]),
+                np.array([x[2].to_numpy() for x in self.best_training_samples]),
+            )
 
     def train(self, inputs: Knowledge, outputs: Knowledge):
         combined_model = self.get_combined_model(inputs.format, outputs.format)

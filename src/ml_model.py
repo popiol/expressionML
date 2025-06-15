@@ -36,24 +36,30 @@ class MlModel:
             return self.model.predict(input_batch, verbose=0)[0]
         raise ValueError(f"Unknown mode: {self.mode}")
 
-    def train(self, inputs: np.ndarray, outputs: np.ndarray):
+    def train(self, inputs: np.ndarray, outputs: np.ndarray, n_epochs: int = 1):
         input_batch = inputs.reshape((1, -1))
         output_batch = outputs.reshape((1, -1))
-        if self.batch is None or len(self.batch) >= self.batch_size - 1:
+        if self.batch is None:
             self.batch = (input_batch, output_batch)
         else:
             self.batch = (np.concatenate((self.batch[0], input_batch)), np.concatenate((self.batch[1], output_batch)))
             input_batch = self.batch[0]
             output_batch = self.batch[1]
         if len(input_batch) >= self.batch_size - 1:
-            self.model.fit(input_batch, output_batch, verbose=0)
+            print("Training model with full batch")
+            self.model.fit(input_batch, output_batch, verbose=0, epochs=self.batch_size * n_epochs)
+            self.batch = tuple(batch[1 - self.batch_size :] for batch in self.batch)  # type: ignore
+
+    def train_batch(self, inputs: np.ndarray, outputs: np.ndarray):
+        print(f"Training model with batch size {len(inputs)}")
+        self.model.fit(inputs, outputs, verbose=0, epochs=len(inputs))
 
     def set_training_mode(self):
         self.mode = PredictionMode.TRAIN
         self.model_with_noise = keras.models.clone_model(self.model)
         weights = self.model.get_weights()
         for layer in weights:
-            layer += np.random.normal(loc=0.0, scale=0.4, size=layer.shape)
+            layer += np.random.normal(loc=0.0, scale=0.1, size=layer.shape)
         assert self.model_with_noise is not None
         self.model_with_noise.set_weights(weights)
 
