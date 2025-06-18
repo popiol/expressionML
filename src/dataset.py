@@ -23,6 +23,6 @@ class Dataset:
             elif operation == 3:
                 result = x / y
             yield (
-                self.knowledge_factory.from_list([x, y, operation]),
-                self.knowledge_factory.from_list([result]),
+                self.knowledge_factory.from_dict({"x": x, "y": y, "operation": operation}),
+                self.knowledge_factory.from_dict({"result": result}),
             )

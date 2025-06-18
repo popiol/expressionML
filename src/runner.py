@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from enum import Enum, auto
 
 from src.agent import Agent
+from src.coder import AdvancedCoder
 from src.dataset import Dataset
-from src.knowledge import Knowledge, KnowledgeCoder, KnowledgeFactory
+from src.knowledge import Knowledge, KnowledgeFactory
 from src.ml_model import MlModelFactory
 from src.stats import Stats
 from src.utils import timer
@@ -29,8 +30,10 @@ class Runner:
         for inputs, outputs in self.dataset:
             action = self.agent.act(inputs, outputs.format)
             if random.random() < 0.01:
-                print("inputs:", inputs.data[0].value, inputs.data[1].value, inputs.data[2].value)
+                # print("inputs:", inputs.data[0].value, inputs.data[1].value, inputs.data[2].value)
                 print("outputs/pred:", outputs.data[0].value, action.data[0].value)
+                # print("output", outputs.data[0].encoded_value)
+                print("action", action.data[0].encoded_value)
             score = self.evaluate(action, outputs)
             yield inputs, outputs, action, score
 
@@ -60,8 +63,8 @@ class Runner:
 
 
 def main():
-    embedding_size = 1
-    knowledge_factory = KnowledgeFactory(coder=KnowledgeCoder(embedding_size), capacity=1000)
+    embedding_size = 64
+    knowledge_factory = KnowledgeFactory(coder=AdvancedCoder(embedding_size), capacity=1000)
     model_factory = MlModelFactory(batch_size=32)
     runner = Runner(
         dataset=Dataset(
@@ -69,7 +72,7 @@ def main():
             knowledge_factory=knowledge_factory,
         ),
         agent=Agent.init(
-            model_version="v1",
+            model_version="lstm",
             global_knowledge=None,
             use_memory=False,
             model_factory=model_factory,
@@ -78,7 +81,7 @@ def main():
             batch_size=32,
         ),
         max_iterations=100,
-        train_mode=TrainMode.FEEDBACK,
+        train_mode=TrainMode.GROUND_TRUTH,
     )
     runner.run()
 

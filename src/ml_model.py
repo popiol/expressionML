@@ -83,6 +83,8 @@ class MlModelFactory:
     def get_model(self, version: str, input_size: int, output_size: int) -> MlModel:
         if version == "v1":
             model = self.v1(input_size, output_size)
+        elif version == "lstm":
+            model = self.lstm(input_size, output_size)
         else:
             raise ValueError(f"Unknown model version: {version}")
         return MlModel(raw_model=model, version=version, batch_size=self.batch_size)
@@ -93,6 +95,17 @@ class MlModelFactory:
                 keras.layers.Input(shape=(input_size,)),
                 keras.layers.Dense(64, activation="relu"),
                 keras.layers.Dense(64, activation="relu"),
-                keras.layers.Dense(output_size, activation="linear"),
+                keras.layers.Dense(output_size),
+            ]
+        )
+
+    def lstm(self, input_size: int, output_size: int) -> keras.Model:
+        return keras.Sequential(
+            [
+                keras.layers.Input(shape=(input_size,)),
+                keras.layers.Dense(output_size * 64),
+                keras.layers.Reshape((output_size, 64)),
+                keras.layers.LSTM(output_size),
+                keras.layers.Dense(output_size),
             ]
         )

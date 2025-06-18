@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cached_property
 
 import numpy as np
 
@@ -62,10 +63,50 @@ class KnowledgeFormat:
 
 @dataclass
 class AtomicKnowledge:
-    key: Descriptive
-    value: Descriptive
-    encoded_key: Embedding
-    encoded_value: Embedding
+    coder: KnowledgeCoder
+
+    @cached_property
+    def key(self):
+        return self.coder.decode(self.encoded_key)
+
+    @cached_property
+    def value(self):
+        return self.coder.decode(self.encoded_value, self.value_type)
+
+    @cached_property
+    def value_type(self):
+        return type(self.value)
+
+    @cached_property
+    def encoded_key(self):
+        return self.coder.encode(self.key)
+
+    @cached_property
+    def encoded_value(self):
+        return self.coder.encode(self.value)
+
+    @staticmethod
+    def init(
+        coder: KnowledgeCoder,
+        key: Descriptive | None = None,
+        value: Descriptive | None = None,
+        value_type: type[Descriptive] | None = None,
+        encoded_key: Embedding | None = None,
+        encoded_value: Embedding | None = None,
+    ):
+        ak = AtomicKnowledge(coder)
+        if key is not None:
+            ak.key = key
+        assert value is not None or value_type is not None
+        if value is not None:
+            ak.value = value
+        if value_type is not None:
+            ak.value_type = value_type
+        if encoded_key is not None:
+            ak.encoded_key = encoded_key
+        if encoded_value is not None:
+            ak.encoded_value = encoded_value
+        return ak
 
 
 @dataclass
@@ -111,16 +152,15 @@ class KnowledgeFactory:
     coder: KnowledgeCoder
     capacity: int
 
-    def from_list(self, values: list[Descriptive]) -> Knowledge:
+    def from_dict(self, values: dict[str, Descriptive]) -> Knowledge:
         return Knowledge(
             data=[
-                AtomicKnowledge(
-                    key=index,
+                AtomicKnowledge.init(
+                    self.coder,
+                    key=key,
                     value=value,
-                    encoded_key=self.coder.encode(index),
-                    encoded_value=self.coder.encode(value),
                 )
-                for index, value in enumerate(values)
+                for key, value in values.items()
             ],
             capacity=self.capacity,
         )
@@ -137,9 +177,10 @@ class KnowledgeFactory:
         for af in expected_format.format:
             value = values[offset : offset + af.encoded_value_length]
             knowledge.add(
-                AtomicKnowledge(
+                AtomicKnowledge.init(
+                    self.coder,
                     key=af.key,
-                    value=self.coder.decode(Embedding.from_numpy(value), af.value_type),
+                    value_type=af.value_type,
                     encoded_key=af.encoded_key,
                     encoded_value=Embedding.from_numpy(value),
                 )
