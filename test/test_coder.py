@@ -1,33 +1,32 @@
 import numpy as np
 import pytest
 
-from src.coder import AdvancedCoder
+from src.lookup_coder import LookupCoder
+
+coders = [LookupCoder(i) for i in [8]]
 
 
-@pytest.fixture
-def coder():
-    return AdvancedCoder(32)
-
-
+@pytest.mark.parametrize("coder", coders)
 def test_encode_decode_integer(coder):
-    value = 123
-    vector = coder.encode_integer(value)
-    embedding = coder.to_embedding(vector)
-    decoded = coder.decode_integer(embedding)
-    assert decoded == value
+    for value in [0, 1, 123, 512, -1, -9, -512]:
+        embedding = coder.encode(value)
+        decoded = coder.decode(embedding, int)
+        print(value, embedding, decoded)
+        assert decoded == value
 
 
+@pytest.mark.parametrize("coder", coders)
 def test_encode_decode_float(coder):
-    value = -3.14
-    vector = coder.encode_float(value)
-    embedding = coder.to_embedding(vector)
-    decoded = coder.decode_float(embedding)
-    assert np.isclose(decoded, value)
+    for value in [0.0, -3.14, -0.001, 0.001, 3.14]:
+        embedding = coder.encode(value)
+        decoded = coder.decode(embedding, float)
+        print(value, embedding, decoded)
+        assert np.isclose(decoded, value)
 
 
+@pytest.mark.parametrize("coder", coders)
 def test_encode_decode_text(coder):
     text = "hello world"
-    vector = coder.encode_text(text)
-    embedding = coder.to_embedding(vector)
-    decoded = coder.decode_text(embedding)
+    embedding = coder.encode(text)
+    decoded = coder.decode(embedding, str)
     assert text == decoded

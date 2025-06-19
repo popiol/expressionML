@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from enum import Enum, auto
 
 from src.agent import Agent
-from src.coder import AdvancedCoder
 from src.dataset import Dataset
 from src.knowledge import Knowledge, KnowledgeFactory
+from src.lookup_coder import LookupCoder
 from src.ml_model import MlModelFactory
 from src.stats import Stats
 from src.utils import timer
@@ -64,7 +64,7 @@ class Runner:
 
 def main():
     embedding_size = 64
-    knowledge_factory = KnowledgeFactory(coder=AdvancedCoder(embedding_size), capacity=1000)
+    knowledge_factory = KnowledgeFactory(coder=LookupCoder(embedding_size), capacity=1000)
     model_factory = MlModelFactory(batch_size=32)
     runner = Runner(
         dataset=Dataset(

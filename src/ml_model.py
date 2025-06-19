@@ -109,3 +109,15 @@ class MlModelFactory:
                 keras.layers.Dense(output_size),
             ]
         )
+
+    def autoencoder(self, input_size: int, embedding_size: int) -> keras.Model:
+        return keras.Sequential(
+            [
+                keras.layers.Input(shape=(input_size,)),
+                keras.layers.Dense(embedding_size, activation="relu"),
+                keras.layers.Dense(embedding_size, activation="relu"),
+                keras.layers.Dense(embedding_size, activation="relu"),
+                keras.layers.Dense(embedding_size, activation="relu"),
+                keras.layers.Dense(input_size),
+            ]
+        )

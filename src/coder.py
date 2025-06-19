@@ -7,6 +7,30 @@ from transformers import AutoTokenizer
 from src.knowledge import Descriptive, Embedding, KnowledgeCoder
 
 
+@lru_cache(maxsize=1000000)
+def encode_text(text: str, embedding_size: int, tokenizer: AutoTokenizer) -> Iterable:
+    tokens = tokenizer(text).input_ids
+    return encode_integer_list(tuple(tokens), embedding_size)
+
+
+@lru_cache(maxsize=1000000)
+def encode_integer_list(values: tuple[int], embedding_size: int) -> Iterable:
+    size = embedding_size // len(values)
+    encoded_size = encode_integer(size)[:4].rjust(4, "0")
+    return encoded_size + "".join([encode_integer(x)[:size].rjust(size, "0") for x in values])
+
+
+@lru_cache(maxsize=1000000)
+def encode_integer(value: int) -> Iterable:
+    return format(value, "b")
+
+
+@lru_cache(maxsize=1000000)
+def decode_integer(vector: tuple[float, ...]) -> int:
+    binary_str = "".join(format(int(x), "b") for x in vector)
+    return int(binary_str, 2)
+
+
 class AdvancedCoder(KnowledgeCoder):
     def encode(self, value: Descriptive) -> Embedding:
         if isinstance(value, str):
@@ -37,32 +61,18 @@ class AdvancedCoder(KnowledgeCoder):
         return AutoTokenizer.from_pretrained("google-t5/t5-small")
 
     def encode_text(self, text: str) -> Iterable:
-        """Encode text using gte-small from huggingface."""
-        tokens = self.__class__.text_to_tokens(text, self.embedding_size, self.tokenizer)
-        size = self.embedding_size // len(tokens)
-        encoded_size = self.encode_integer(size)[:4].rjust(4, "0")
-        return encoded_size + "".join([self.encode_integer(x)[:size].rjust(size, "0") for x in tokens])
-
-    @lru_cache(maxsize=1000000)
-    @staticmethod
-    def text_to_tokens(text: str, embedding_size: int, tokenizer: AutoTokenizer) -> Iterable:
-        return tokenizer(text).input_ids
+        return encode_text(text, self.embedding_size, self.tokenizer)
 
     def encode_integer(self, value: int) -> Iterable:
         """Encode integer as a binary vector."""
-        return self.__class__._encode_integer(value)
-
-    @lru_cache(maxsize=1000000)
-    @staticmethod
-    def _encode_integer(value: int) -> Iterable:
-        return format(value, "b")
+        return encode_integer(value)
 
     def encode_float(self, value: float) -> Iterable:
         """Encode float as a binary vector."""
         [d] = struct.unpack(">I", struct.pack(">f", value))
-        if self.embedding_size < 32:
-            return f"{d:016b}"
         if self.embedding_size < 64:
+            return f"{d:016b}"
+        if self.embedding_size < 128:
             return f"{d:032b}"
         return f"{d:064b}"
 
@@ -74,22 +84,16 @@ class AdvancedCoder(KnowledgeCoder):
         return self.tokenizer.decode(tokens)
 
     def decode_integer(self, embedding: Embedding) -> int:
-        return self.__class__._decode_integer(embedding.data)
-
-    @lru_cache(maxsize=1000000)
-    @staticmethod
-    def _decode_integer(vector: tuple[float, ...]) -> int:
-        binary_str = "".join(format(int(x), "b") for x in vector)
-        return int(binary_str, 2)
+        return decode_integer(embedding.data)
 
     def decode_float(self, embedding: Embedding) -> float:
         binary_str = "".join(format(max(0, min(1, round(x))), "b") for x in embedding.data)
-        if self.embedding_size < 32:
-            binary_str = binary_str.zfill(16)[:16]
-        elif self.embedding_size < 64:
+        if self.embedding_size < 64:
             binary_str = binary_str.zfill(32)[:32]
-        else:
+        elif self.embedding_size < 128:
             binary_str = binary_str.zfill(64)[:64]
+        else:
+            binary_str = binary_str.zfill(128)[:128]
             return struct.unpack(">d", int(binary_str, 2).to_bytes(8, byteorder="big"))[0]
         packed_value = struct.pack(">I", int(binary_str, 2))
         return struct.unpack(">f", packed_value)[0]
