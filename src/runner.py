@@ -24,7 +24,8 @@ class Runner:
     train_mode: TrainMode
 
     def evaluate(self, action: Knowledge, outputs: Knowledge):
-        return -action.distance_to(outputs)
+        # return -action.distance_to(outputs)
+        return -abs(action.data[0].value - outputs.data[0].value)
 
     def simulate(self):
         for inputs, outputs in self.dataset:
@@ -32,7 +33,7 @@ class Runner:
             if random.random() < 0.01:
                 # print("inputs:", inputs.data[0].value, inputs.data[1].value, inputs.data[2].value)
                 print("outputs/pred:", outputs.data[0].value, action.data[0].value)
-                # print("output", outputs.data[0].encoded_value)
+                print("output", outputs.data[0].encoded_value)
                 print("action", action.data[0].encoded_value)
             score = self.evaluate(action, outputs)
             yield inputs, outputs, action, score
@@ -63,16 +64,16 @@ class Runner:
 
 
 def main():
-    embedding_size = 64
+    embedding_size = 2
     knowledge_factory = KnowledgeFactory(coder=LookupCoder(embedding_size), capacity=1000)
-    model_factory = MlModelFactory(batch_size=32)
+    model_factory = MlModelFactory(batch_size=100)
     runner = Runner(
         dataset=Dataset(
             batch_size=32,
             knowledge_factory=knowledge_factory,
         ),
         agent=Agent.init(
-            model_version="lstm",
+            model_version="v1",
             global_knowledge=None,
             use_memory=False,
             model_factory=model_factory,
