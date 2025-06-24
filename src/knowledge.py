@@ -40,6 +40,9 @@ class KnowledgeCoder:
             return float(embedding.data[0])
         raise ValueError(f"Unsupported type for decoding: {output_type}")
 
+    def with_embedding_size(self, embedding_size: int):
+        return self.__class__(embedding_size)
+
 
 @dataclass
 class AtomicFormat:
@@ -112,8 +115,6 @@ class AtomicKnowledge:
 @dataclass
 class Knowledge:
     data: list[AtomicKnowledge]
-    capacity: int
-    """The maximum number of atomic knowledge entries allowed in this knowledge base."""
 
     @property
     def format(self):
@@ -150,26 +151,24 @@ class Knowledge:
 @dataclass
 class KnowledgeFactory:
     coder: KnowledgeCoder
-    capacity: int
 
-    def from_dict(self, values: dict[str, Descriptive]) -> Knowledge:
+    def from_dict(self, values: dict[str, Descriptive], embedding_size: int = None) -> Knowledge:
+        coder = self.coder
+        if embedding_size and self.coder.embedding_size != embedding_size:
+            coder = self.coder.with_embedding_size(embedding_size)
         return Knowledge(
             data=[
                 AtomicKnowledge.init(
-                    self.coder,
+                    coder,
                     key=key,
                     value=value,
                 )
                 for key, value in values.items()
             ],
-            capacity=self.capacity,
         )
 
     def empty(self) -> Knowledge:
-        return Knowledge(
-            data=[],
-            capacity=self.capacity,
-        )
+        return Knowledge(data=[])
 
     def from_numpy(self, values: np.ndarray, expected_format: KnowledgeFormat) -> Knowledge:
         knowledge = self.empty()
@@ -181,9 +180,28 @@ class KnowledgeFactory:
                     self.coder,
                     key=af.key,
                     value_type=af.value_type,
-                    encoded_key=af.encoded_key,
                     encoded_value=Embedding.from_numpy(value),
                 )
             )
             offset += af.encoded_value_length
         return knowledge
+
+    def from_format(self, expected_format: KnowledgeFormat) -> Knowledge:
+        return Knowledge(
+            [
+                AtomicKnowledge.init(self.coder, key=af.key, encoded_value=np.zeros(af.encoded_value_length))
+                for af in expected_format.format
+            ]
+        )
+
+
+@dataclass
+class KnowledgeService:
+    response_limit: int
+
+    def get(self, limit: int = None, name: str = None, expected_format: KnowledgeFormat = None) -> list[Knowledge]:
+        limit = min(limit or self.response_limit, self.response_limit)
+        return self._get_limited(limit, name, expected_format)
+
+    def _get_limited(self, limit: int, name: str = None, expected_format: KnowledgeFormat = None) -> list[Knowledge]:
+        raise NotImplementedError()

@@ -3,7 +3,7 @@ import pytest
 
 from src.lookup_coder import LookupCoder
 
-coders = [LookupCoder(i) for i in [64]]
+coders = [LookupCoder(i) for i in [1, 2, 3, 4, 8, 16, 32, 64]]
 
 
 @pytest.mark.parametrize("coder", coders)

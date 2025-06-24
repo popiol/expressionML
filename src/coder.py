@@ -1,34 +1,10 @@
-import struct
-from functools import cached_property, lru_cache
+import math
+from functools import cached_property
 from typing import Iterable
 
-from transformers import AutoTokenizer
+import numpy as np
 
 from src.knowledge import Descriptive, Embedding, KnowledgeCoder
-
-
-@lru_cache(maxsize=1000000)
-def encode_text(text: str, embedding_size: int, tokenizer: AutoTokenizer) -> Iterable:
-    tokens = tokenizer(text).input_ids
-    return encode_integer_list(tuple(tokens), embedding_size)
-
-
-@lru_cache(maxsize=1000000)
-def encode_integer_list(values: tuple[int], embedding_size: int) -> Iterable:
-    size = embedding_size // len(values)
-    encoded_size = encode_integer(size)[:4].rjust(4, "0")
-    return encoded_size + "".join([encode_integer(x)[:size].rjust(size, "0") for x in values])
-
-
-@lru_cache(maxsize=1000000)
-def encode_integer(value: int) -> Iterable:
-    return format(value, "b")
-
-
-@lru_cache(maxsize=1000000)
-def decode_integer(vector: tuple[float, ...]) -> int:
-    binary_str = "".join(format(int(x), "b") for x in vector)
-    return int(binary_str, 2)
 
 
 class AdvancedCoder(KnowledgeCoder):
@@ -57,43 +33,80 @@ class AdvancedCoder(KnowledgeCoder):
         raise ValueError(f"Unsupported type for decoding: {output_type}")
 
     @cached_property
-    def tokenizer(self):
-        return AutoTokenizer.from_pretrained("google-t5/t5-small")
+    def text_map(self) -> tuple[dict[str, Embedding], dict[Embedding, str], list[int]]:
+        return {}, {}, [0]
 
     def encode_text(self, text: str) -> Iterable:
-        return encode_text(text, self.embedding_size, self.tokenizer)
-
-    def encode_integer(self, value: int) -> Iterable:
-        """Encode integer as a binary vector."""
-        return encode_integer(value)
-
-    def encode_float(self, value: float) -> Iterable:
-        """Encode float as a binary vector."""
-        [d] = struct.unpack(">I", struct.pack(">f", value))
-        if self.embedding_size < 64:
-            return f"{d:016b}"
-        if self.embedding_size < 128:
-            return f"{d:032b}"
-        return f"{d:064b}"
+        text_map, text_map_rev, index = self.text_map
+        if text not in text_map:
+            text_map[text] = self.encode_integer(index[0])
+            text_map_rev[tuple(text_map[text])] = text
+            index[0] += 1
+        return text_map[text]
 
     def decode_text(self, embedding: Embedding) -> str:
-        size = self.decode_integer(Embedding(embedding.data[:4]))
-        tokens = []
-        for index in range((self.embedding_size - 4) // size):
-            tokens.append(self.decode_integer(Embedding(embedding.data[index * size + 4 : (index + 1) * size + 4])))
-        return self.tokenizer.decode(tokens)
+        text_map, text_map_rev, index = self.text_map
+        if embedding.data in text_map_rev:
+            return text_map_rev[embedding.data]
+        return ""
+
+    def encode_integer(self, value: int) -> Iterable:
+        return self.encode_float(value)
 
     def decode_integer(self, embedding: Embedding) -> int:
-        return decode_integer(embedding.data)
+        return round(self.decode_float(embedding))
+
+    def encode_small_integer(self, value: int, embedding_size: int | None = None, scale: float = 1.0) -> Iterable:
+        sign = int(np.sign(value))
+        value = abs(value)
+        result = format(value, "b")
+        if embedding_size:
+            if embedding_size > len(result):
+                result = result.zfill(embedding_size)
+            elif embedding_size < len(result):
+                last_str = result[embedding_size - 1 :]
+                last = int(last_str, 2)
+                result = [int(x) * 2 ** (len(result) - embedding_size) for x in result[: embedding_size - 1]] + [last]
+        return [sign * int(x) / scale for x in result]
+
+    def decode_small_integer(self, embedding: Embedding, scale: float = 1.0) -> int:
+        result = 0
+        for val in embedding.data:
+            result = result * 2 + val * scale
+        return int(result)
+
+    def encode_binary(self, value: float, embedding_size: int | None = None) -> Iterable:
+        """Encodes numbers from [-1, 1]"""
+        embedding_size = embedding_size if embedding_size else self.embedding_size
+        x = value
+        result = []
+        for index in range(embedding_size - 1):
+            x = (x - int(x)) * 2
+            result.append(int(x))
+        result.append(x - int(x))
+        return result
+
+    def decode_binary(self, embedding: Embedding) -> int:
+        embedding_size = len(embedding.data)
+        last = embedding.data[embedding_size - 1] * 0.5 ** (embedding_size - 1)
+        return sum(embedding.data[index] * 0.5 ** (index + 1) for index in range(embedding_size - 1)) + last
+
+    def encode_float(self, value: float) -> Iterable:
+        if self.embedding_size == 1:
+            return [value]
+        significand, exponent = math.frexp(value)
+        significant_len = max(self.embedding_size // 2, self.embedding_size - 4)
+        encoded1 = self.encode_binary(significand, significant_len)
+        encoded2 = self.encode_small_integer(exponent, self.embedding_size - significant_len, scale=10)
+        return encoded1 + encoded2
 
     def decode_float(self, embedding: Embedding) -> float:
-        binary_str = "".join(format(max(0, min(1, round(x))), "b") for x in embedding.data)
-        if self.embedding_size < 64:
-            binary_str = binary_str.zfill(32)[:32]
-        elif self.embedding_size < 128:
-            binary_str = binary_str.zfill(64)[:64]
-        else:
-            binary_str = binary_str.zfill(128)[:128]
-            return struct.unpack(">d", int(binary_str, 2).to_bytes(8, byteorder="big"))[0]
-        packed_value = struct.pack(">I", int(binary_str, 2))
-        return struct.unpack(">f", packed_value)[0]
+        vector = embedding.data
+        if self.embedding_size == 1:
+            return vector[0]
+        significant_len = max(self.embedding_size // 2, self.embedding_size - 4)
+        encoded1 = vector[:significant_len]
+        encoded2 = vector[significant_len:]
+        significand = self.decode_binary(Embedding(encoded1))
+        exponent = self.decode_small_integer(Embedding(encoded2), scale=10)
+        return significand * 2**exponent
