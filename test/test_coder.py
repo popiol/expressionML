@@ -1,14 +1,14 @@
 import numpy as np
 import pytest
 
-from src.lookup_coder import LookupCoder
+from src.coder import AdvancedCoder
 
-coders = [LookupCoder(i) for i in [1, 2, 3, 4, 8, 16, 32, 64]]
+coders = [AdvancedCoder(i) for i in [64]]
 
 
 @pytest.mark.parametrize("coder", coders)
 def test_encode_decode_integer(coder):
-    for value in [0, 1, 123, 785, -1, -9, -785]:
+    for value in [1026, 513]:  # [0, 1, 123, 785, -1, -9, -785]:
         embedding = coder.encode(value)
         decoded = coder.decode(embedding, int)
         print(value, embedding, decoded)

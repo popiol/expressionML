@@ -115,6 +115,7 @@ class Agent:
             model.set_evaluation_mode()
 
     def act(self, inputs: list[Knowledge], expected_format: KnowledgeFormat) -> list[Knowledge]:
+        print("act")
         assert inputs
         combined_model = self.get_combined_model(inputs[0].format, expected_format)
         all_inputs = [np.array([x.to_numpy() for x in inputs])]
@@ -141,6 +142,7 @@ class Agent:
         return [self.knowledge_factory.from_numpy(x, expected_format) for x in outputs]
 
     def acknowledge_feedback(self, inputs: list[Knowledge], actions: list[Knowledge], scores: list[float]) -> None:
+        print("acknowledge_feedback")
         self.train_counter += 1
         if len(self.training_batch) == 0:
             for x, y, s in zip(inputs, actions, scores):
@@ -159,7 +161,7 @@ class Agent:
             )
 
     def train(self, inputs: list[Knowledge], outputs: list[Knowledge]):
-        print("train")
+        print("train agent")
         assert inputs
         all_inputs = [np.array([x.to_numpy() for x in inputs])]
         output_size = outputs[0].format.size
@@ -173,6 +175,13 @@ class Agent:
             if not self.use_short_memory:
                 break
             predicted = combined_model.predict(all_inputs)
+            error = max(
+                self.knowledge_factory.from_numpy(x, outputs[0].format).distance_to(
+                    self.knowledge_factory.from_numpy(y, outputs[0].format)
+                )
+                for x, y in zip(predicted, all_outputs)
+            )
+            print("error", error)
             if prev_predicted is not None:
                 diff = max(
                     self.knowledge_factory.from_numpy(x, outputs[0].format).distance_to(

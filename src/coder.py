@@ -97,16 +97,19 @@ class AdvancedCoder(KnowledgeCoder):
         significand, exponent = math.frexp(value)
         significant_len = max(self.embedding_size // 2, self.embedding_size - 4)
         encoded1 = self.encode_binary(significand, significant_len)
-        encoded2 = self.encode_small_integer(exponent, self.embedding_size - significant_len, scale=10)
+        encoded2 = self.encode_small_integer(exponent, self.embedding_size - significant_len)
         return encoded1 + encoded2
 
     def decode_float(self, embedding: Embedding) -> float:
-        vector = embedding.data
+        significant_len = max(self.embedding_size // 2, self.embedding_size - 4)
+        vector = [round(x) for x in embedding.data]
+        # vector[significant_len - 1] = embedding.data[significant_len - 1]
+        # vector[-1] = embedding.data[-1]
         if self.embedding_size == 1:
             return vector[0]
         significant_len = max(self.embedding_size // 2, self.embedding_size - 4)
         encoded1 = vector[:significant_len]
         encoded2 = vector[significant_len:]
         significand = self.decode_binary(Embedding(encoded1))
-        exponent = self.decode_small_integer(Embedding(encoded2), scale=10)
+        exponent = self.decode_small_integer(Embedding(encoded2))
         return significand * 2**exponent

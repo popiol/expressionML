@@ -1,6 +1,7 @@
-import random
 from dataclasses import dataclass
 from enum import Enum, auto
+
+import numpy as np
 
 from src.agent import Agent
 from src.coder import AdvancedCoder
@@ -30,23 +31,28 @@ class Runner:
     def simulate(self):
         inputs, outputs = self.dataset.get_batch()
         actions = self.agent.act(inputs, outputs[0].format)
-        if random.random() < 0.1:
-            print("outputs/pred:", outputs[0].data[0].value, actions[0].data[0].value)
-            print("output", outputs[0].data[0].encoded_value)
-            print("action", actions[0].data[0].encoded_value)
         scores = self.evaluate(actions, outputs)
+        worst = np.argmin(scores)
+        print("inputs:", [x.value for x in inputs[worst].data])
+        print("outputs/pred:", outputs[worst].data[0].value, actions[worst].data[0].value)
+        print("output", outputs[worst].data[0].encoded_value.data)
+        print("action", [float(round(x)) for x in actions[worst].data[0].encoded_value.data])
         return inputs, outputs, actions, scores
 
     def train(self):
         print("train")
-        self.agent.set_training_mode()
-        inputs, outputs, actions, scores = self.simulate()
+        stats = Stats()
         if self.train_mode == TrainMode.GROUND_TRUTH:
+            inputs, outputs, actions, scores = self.simulate()
             self.agent.train(inputs, outputs)
         elif self.train_mode == TrainMode.FEEDBACK:
+            self.agent.set_training_mode()
+            inputs, outputs, actions, scores = self.simulate()
             self.agent.acknowledge_feedback(inputs, actions, scores)
         else:
             raise ValueError(f"Unknown train mode: {self.train_mode}")
+        stats.add_batch(scores)
+        print(f"Train score: {stats.mean}, {stats.min}")
 
     def test(self):
         print("test")
@@ -63,7 +69,7 @@ class Runner:
 
 
 def main():
-    embedding_size = 1
+    embedding_size = 64
     knowledge_factory = KnowledgeFactory(coder=AdvancedCoder(embedding_size))
     model_factory = MlModelFactory()
     runner = Runner(
@@ -72,7 +78,7 @@ def main():
             knowledge_factory=knowledge_factory,
         ),
         agent=Agent.init(
-            model_version="v1",
+            model_version="v4",
             global_knowledge=None,
             use_memory=False,
             use_short_memory=False,

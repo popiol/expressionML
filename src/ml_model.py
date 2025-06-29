@@ -35,7 +35,7 @@ class MlModel:
 
     def train(self, inputs: np.ndarray | list, outputs: np.ndarray):
         print(f"Training model with batch size {len(outputs)}")
-        self.model.fit(inputs, outputs, verbose=0, epochs=len(inputs))
+        self.model.fit(inputs, outputs, verbose=0, epochs=len(outputs))
 
     def set_training_mode(self):
         self.mode = PredictionMode.TRAIN
@@ -63,85 +63,81 @@ class MlModelFactory:
         return MlModel(raw_model=combined_model, version=version)
 
     def get_model(self, version: str, input_size: int, output_size: int) -> MlModel:
-        if version == "v1":
+        if version == "v0":
+            model = self.v0(input_size, output_size)
+        elif version == "v1":
             model = self.v1(input_size, output_size)
         elif version == "v2":
             model = self.v2(input_size, output_size)
         elif version == "v3":
             model = self.v3(input_size, output_size)
-        elif version == "lstm":
-            model = self.lstm(input_size, output_size)
+        elif version == "v4":
+            model = self.v4(input_size, output_size)
+        elif version == "v5":
+            model = self.v5(input_size, output_size)
+        elif version == "v6":
+            model = self.v6(input_size, output_size)
         else:
             raise ValueError(f"Unknown model version: {version}")
         return MlModel(raw_model=model, version=version)
 
+    def v0(self, input_size: int, output_size: int) -> keras.Model:
+        inputs = keras.layers.Input(shape=(input_size,))
+        l = inputs
+        l = keras.layers.Dense(output_size)(l)
+        return keras.Model(inputs=inputs, outputs=l)
+
     def v1(self, input_size: int, output_size: int) -> keras.Model:
-        return keras.Sequential(
-            [
-                keras.layers.Input(shape=(input_size,)),
-                keras.layers.Dense(100, activation="relu"),
-                keras.layers.Dense(100, activation="relu"),
-                keras.layers.Dense(output_size),
-            ]
-        )
+        inputs = keras.layers.Input(shape=(input_size,))
+        l = inputs
+        for _ in range(2):
+            l = keras.layers.Dense(64, activation="relu")(l)
+        l = keras.layers.Dense(output_size)(l)
+        return keras.Model(inputs=inputs, outputs=l)
 
     def v2(self, input_size: int, output_size: int) -> keras.Model:
         inputs = keras.layers.Input(shape=(input_size,))
         l = inputs
-        l = keras.layers.Dense(64, activation="relu")(l)
-        for _ in range(4):
-            l = keras.layers.Concatenate()([inputs, l])
+        for _ in range(2):
             l = keras.layers.Dense(64, activation="relu")(l)
+            l = keras.layers.Concatenate()([inputs, l])
+            l = keras.layers.UnitNormalization()(l)
         l = keras.layers.Dense(output_size)(l)
         return keras.Model(inputs=inputs, outputs=l)
 
     def v3(self, input_size: int, output_size: int) -> keras.Model:
         inputs = keras.layers.Input(shape=(input_size,))
         l = inputs
-        l1 = keras.layers.Dense(64, activation="relu")(l)
-        l1 = keras.layers.Concatenate()([inputs, l])
-        l1 = keras.layers.Dense(64, activation="relu")(l)
-        l1 = keras.layers.Dense(output_size)(l)
+        state = [l]
+        for _ in range(2):
+            l = keras.layers.Dense(64, activation="relu")(l)
+            state.append(l)
+            l = keras.layers.Concatenate()(state)
+            l = keras.layers.UnitNormalization()(l)
+        l = keras.layers.Dense(output_size)(l)
+        return keras.Model(inputs=inputs, outputs=l)
+
+    def v4(self, input_size: int, output_size: int) -> keras.Model:
+        inputs = keras.layers.Input(shape=(input_size,))
+        l = inputs
+        l1 = keras.layers.Dense(64)(l)
+        l1 = keras.layers.Dense(64)(l1)
+        l1 = keras.layers.Dense(output_size)(l1)
         l2 = keras.layers.Dense(64, activation="relu")(l)
-        l2 = keras.layers.Concatenate()([inputs, l])
-        l2 = keras.layers.Dense(64, activation="relu")(l)
-        l2 = keras.layers.Dense(output_size)(l)
+        l2 = keras.layers.Dense(64, activation="relu")(l2)
+        l2 = keras.layers.Dense(output_size)(l2)
         l3 = keras.layers.Dense(64, activation="relu")(l)
-        l3 = keras.layers.Concatenate()([inputs, l])
-        l3 = keras.layers.Dense(64, activation="relu")(l)
-        l3 = keras.layers.Dense(output_size)(l)
+        l3 = keras.layers.Concatenate()([inputs, l3])
+        l3 = keras.layers.UnitNormalization()(l3)
+        l3 = keras.layers.Dense(output_size)(l3)
         l4 = keras.layers.Dense(64, activation="relu")(l)
-        l4 = keras.layers.Concatenate()([inputs, l])
-        l4 = keras.layers.Dense(64, activation="relu")(l)
-        l4 = keras.layers.Dense(output_size)(l)
+        l44 = keras.layers.Dense(64, activation="relu")(l)
+        l4 = keras.layers.Multiply()([l4, l44])
+        l4 = keras.layers.Dense(output_size)(l4)
         l5 = keras.layers.Dense(64, activation="relu")(l)
-        l5 = keras.layers.Concatenate()([inputs, l])
-        l5 = keras.layers.Dense(64, activation="relu")(l)
-        l5 = keras.layers.Dense(4, activation="softmax")(l)
+        l5 = keras.layers.Dense(64, activation="relu")(l5)
+        l5 = keras.layers.Dense(4, activation="softmax")(l5)
         l = keras.layers.Concatenate()([l1, l2, l3, l4])
         l = keras.layers.Reshape((4, output_size))(l)
         l = keras.layers.Dot(axes=1)([l, l5])
         return keras.Model(inputs=inputs, outputs=l)
-
-    def lstm(self, input_size: int, output_size: int) -> keras.Model:
-        return keras.Sequential(
-            [
-                keras.layers.Input(shape=(input_size,)),
-                keras.layers.Reshape((input_size, 1)),
-                keras.layers.LSTM(output_size, return_sequences=True),
-                keras.layers.Flatten(),
-                keras.layers.Dense(output_size),
-            ]
-        )
-
-    def autoencoder(self, input_size: int, embedding_size: int) -> keras.Model:
-        return keras.Sequential(
-            [
-                keras.layers.Input(shape=(input_size,)),
-                keras.layers.Dense(embedding_size, activation="relu"),
-                keras.layers.Dense(embedding_size, activation="relu"),
-                keras.layers.Dense(embedding_size, activation="relu"),
-                keras.layers.Dense(embedding_size, activation="relu"),
-                keras.layers.Dense(input_size),
-            ]
-        )
