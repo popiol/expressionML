@@ -56,7 +56,7 @@ class AdvancedCoder(KnowledgeCoder):
     def decode_integer(self, embedding: Embedding) -> int:
         return round(self.decode_float(embedding))
 
-    def encode_small_integer(self, value: int, embedding_size: int | None = None, scale: float = 1.0) -> Iterable:
+    def encode_small_integer(self, value: int, embedding_size: int | None = None) -> Iterable:
         sign = int(np.sign(value))
         value = abs(value)
         result = format(value, "b")
@@ -67,12 +67,12 @@ class AdvancedCoder(KnowledgeCoder):
                 last_str = result[embedding_size - 1 :]
                 last = int(last_str, 2)
                 result = [int(x) * 2 ** (len(result) - embedding_size) for x in result[: embedding_size - 1]] + [last]
-        return [sign * int(x) / scale for x in result]
+        return [sign * int(x) for x in result]
 
-    def decode_small_integer(self, embedding: Embedding, scale: float = 1.0) -> int:
+    def decode_small_integer(self, embedding: Embedding) -> int:
         result = 0
         for val in embedding.data:
-            result = result * 2 + val * scale
+            result = result * 2 + val
         return int(result)
 
     def encode_binary(self, value: float, embedding_size: int | None = None) -> Iterable:

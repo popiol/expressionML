@@ -25,7 +25,7 @@ class Runner:
     train_mode: TrainMode
 
     def evaluate(self, actions: list[Knowledge], outputs: list[Knowledge]):
-        # return -action.distance_to(outputs)
+        # return [-x.distance_to(y) for x, y in zip(actions, outputs)]
         return [-abs(x.data[0].value - y.data[0].value) for x, y in zip(actions, outputs)]
 
     def simulate(self):
@@ -35,6 +35,8 @@ class Runner:
         worst = np.argmin(scores)
         print("inputs:", [x.value for x in inputs[worst].data])
         print("outputs/pred:", outputs[worst].data[0].value, actions[worst].data[0].value)
+        print("inputs1:", inputs[worst].data[0].encoded_value.data)
+        print("inputs2:", inputs[worst].data[1].encoded_value.data)
         print("output", outputs[worst].data[0].encoded_value.data)
         print("action", [float(round(x)) for x in actions[worst].data[0].encoded_value.data])
         return inputs, outputs, actions, scores
@@ -78,7 +80,7 @@ def main():
             knowledge_factory=knowledge_factory,
         ),
         agent=Agent.init(
-            model_version="v4",
+            model_version="v6",
             global_knowledge=None,
             use_memory=False,
             use_short_memory=False,

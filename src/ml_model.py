@@ -6,7 +6,7 @@ from functools import cached_property
 
 import numpy as np
 
-from src.keras import keras
+from src.keras import keras, tf
 
 
 class PredictionMode(Enum):
@@ -90,8 +90,8 @@ class MlModelFactory:
     def v1(self, input_size: int, output_size: int) -> keras.Model:
         inputs = keras.layers.Input(shape=(input_size,))
         l = inputs
-        for _ in range(2):
-            l = keras.layers.Dense(64, activation="relu")(l)
+        l = keras.layers.Dense(64, activation="relu")(l)
+        l = keras.layers.Dense(64, activation="relu")(l)
         l = keras.layers.Dense(output_size)(l)
         return keras.Model(inputs=inputs, outputs=l)
 
@@ -118,21 +118,61 @@ class MlModelFactory:
         return keras.Model(inputs=inputs, outputs=l)
 
     def v4(self, input_size: int, output_size: int) -> keras.Model:
+        # inputs = keras.layers.Input(shape=(input_size,))
+        # l = inputs
+        # l1 = keras.layers.Dense(64)(l)
+        # l1 = keras.layers.Dense(64)(l1)
+        # l1 = keras.layers.Dense(output_size)(l1)
+        # l2 = keras.layers.Dense(64, activation="relu")(l)
+        # l2 = keras.layers.Dense(64, activation="relu")(l2)
+        # l2 = keras.layers.Dense(output_size)(l2)
+        # l3 = keras.layers.Dense(64, activation="relu")(l)
+        # l3 = keras.layers.Concatenate()([inputs, l3])
+        # l3 = keras.layers.UnitNormalization()(l3)
+        # l3 = keras.layers.Dense(output_size)(l3)
+        # l4 = keras.layers.Dense(64, activation="relu")(l)
+        # l44 = keras.layers.Dense(64, activation="relu")(l)
+        # l4 = keras.layers.Multiply()([l4, l44])
+        # l4 = keras.layers.Dense(output_size)(l4)
+        # l5 = keras.layers.Reshape((input_size, 1))(l)
+        # l55 = keras.layers.Dot(axes=2)([l5, l5])
+        # l55 = keras.layers.UnitNormalization()(l55)
+        # l5 = keras.layers.Dot(axes=[2,1])([l55, l5])
+        # l5 = keras.layers.Flatten()(l5)
+        # l5 = keras.layers.Dense(64, activation="relu")(l5)
+        # l5 = keras.layers.Dense(output_size)(l5)
+        # l6 = keras.layers.Dense(64, activation="relu")(l)
+        # l6 = keras.layers.Dense(64, activation="relu")(l6)
+        # l6 = keras.layers.Dense(5, activation="softmax")(l6)
+        # l = keras.layers.Concatenate()([l1, l2, l3, l4, l5])
+        # l = keras.layers.Reshape((5, output_size))(l)
+        # l = keras.layers.Dot(axes=1)([l, l6])
+        # return keras.Model(inputs=inputs, outputs=l)
         inputs = keras.layers.Input(shape=(input_size,))
         l = inputs
-        l1 = keras.layers.Dense(64)(l)
-        l1 = keras.layers.Dense(64)(l1)
+        l1 = keras.layers.Dropout(0.5)(l)
+        l1 = keras.layers.Dense(64, activation="relu")(l1)
+        l1 = keras.layers.Concatenate()([inputs, l1])
+        l1 = keras.layers.UnitNormalization()(l1)
+        l1 = keras.layers.Dense(64, activation="relu")(l1)
         l1 = keras.layers.Dense(output_size)(l1)
-        l2 = keras.layers.Dense(64, activation="relu")(l)
+        l2 = keras.layers.Dropout(0.5)(l)
+        l2 = keras.layers.Dense(64, activation="relu")(l2)
+        l2 = keras.layers.Concatenate()([inputs, l2])
+        l2 = keras.layers.UnitNormalization()(l2)
         l2 = keras.layers.Dense(64, activation="relu")(l2)
         l2 = keras.layers.Dense(output_size)(l2)
-        l3 = keras.layers.Dense(64, activation="relu")(l)
+        l3 = keras.layers.Dropout(0.5)(l)
+        l3 = keras.layers.Dense(64, activation="relu")(l3)
         l3 = keras.layers.Concatenate()([inputs, l3])
         l3 = keras.layers.UnitNormalization()(l3)
-        l3 = keras.layers.Dense(output_size)(l3)
-        l4 = keras.layers.Dense(64, activation="relu")(l)
-        l44 = keras.layers.Dense(64, activation="relu")(l)
-        l4 = keras.layers.Multiply()([l4, l44])
+        l3 = keras.layers.Dense(64, activation="relu")(l3)
+        l3 = keras.layers.Dense(output_size)(l3)        
+        l4 = keras.layers.Dropout(0.5)(l)
+        l4 = keras.layers.Dense(64, activation="relu")(l4)
+        l4 = keras.layers.Concatenate()([inputs, l4])
+        l4 = keras.layers.UnitNormalization()(l4)
+        l4 = keras.layers.Dense(64, activation="relu")(l4)
         l4 = keras.layers.Dense(output_size)(l4)
         l5 = keras.layers.Dense(64, activation="relu")(l)
         l5 = keras.layers.Dense(64, activation="relu")(l5)
@@ -140,4 +180,25 @@ class MlModelFactory:
         l = keras.layers.Concatenate()([l1, l2, l3, l4])
         l = keras.layers.Reshape((4, output_size))(l)
         l = keras.layers.Dot(axes=1)([l, l5])
+        return keras.Model(inputs=inputs, outputs=l)
+
+    def v5(self, input_size: int, output_size: int) -> keras.Model:
+        inputs = keras.layers.Input(shape=(input_size,))
+        l = inputs
+        l = keras.layers.Reshape((input_size, 1))(l)
+        l2 = keras.layers.Dot(axes=2)([l, l])
+        l2 = keras.layers.UnitNormalization()(l2)
+        l = keras.layers.Dot(axes=[2,1])([l2, l])
+        l = keras.layers.Flatten()(l)
+        l = keras.layers.Dense(64, activation="relu")(l)
+        l = keras.layers.Dense(output_size)(l)
+        return keras.Model(inputs=inputs, outputs=l)
+
+    def v6(self, input_size: int, output_size: int) -> keras.Model:
+        inputs = keras.layers.Input(shape=(input_size,))
+        l = inputs
+        l = keras.layers.Dense(64, activation="relu")(l)
+        l2 = keras.layers.Dense(64, activation="relu")(l)
+        l = keras.layers.Multiply()([l, l2])
+        l = keras.layers.Dense(output_size)(l)
         return keras.Model(inputs=inputs, outputs=l)
