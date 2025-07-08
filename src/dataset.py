@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from src.coder import AdvancedCoder
-from src.knowledge import Embedding, KnowledgeFactory
+from src.knowledge import Embedding, KnowledgeFactory, PieceOfKnowledge
 
 
 @dataclass
@@ -16,7 +16,7 @@ class Dataset:
         for _ in range(self.batch_size):
             x = random.random()
             y = random.random()
-            operation = random.randrange(2)
+            operation = 0 # random.randrange(2)
             if operation == 0:
                 result = x + y
             elif operation == 1:
@@ -83,10 +83,20 @@ class Dataset:
                 )
                 break
 
+    def one_hot(self):
+        for _ in range(self.batch_size):
+            x = random.randrange(64)
+            y = [0] * 64
+            y[x] = 1
+            yield (
+                self.knowledge_factory.from_dict({"x": x}),
+                self.knowledge_factory.from_dict({f"result{yi}": y[yi] for yi in range(64)}),
+            )
+
     def get_batch(self):
         input_batch = []
         output_batch = []
         for inputs, outputs in self.arithmetic():
             input_batch.append(inputs)
             output_batch.append(outputs)
-        return input_batch, output_batch
+        return PieceOfKnowledge(input_batch), PieceOfKnowledge(output_batch)

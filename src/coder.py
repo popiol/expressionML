@@ -66,7 +66,10 @@ class AdvancedCoder(KnowledgeCoder):
             elif embedding_size < len(result):
                 last_str = result[embedding_size - 1 :]
                 last = int(last_str, 2)
-                result = [int(x) * 2 ** (len(result) - embedding_size) for x in result[: embedding_size - 1]] + [last]
+                result = [
+                    int(x) * 2 ** (len(result) - embedding_size)
+                    for x in result[: embedding_size - 1]
+                ] + [last]
         return [sign * int(x) for x in result]
 
     def decode_small_integer(self, embedding: Embedding) -> int:
@@ -89,7 +92,10 @@ class AdvancedCoder(KnowledgeCoder):
     def decode_binary(self, embedding: Embedding) -> int:
         embedding_size = len(embedding.data)
         last = embedding.data[embedding_size - 1] * 0.5 ** (embedding_size - 1)
-        return sum(embedding.data[index] * 0.5 ** (index + 1) for index in range(embedding_size - 1)) + last
+        return (
+            sum(embedding.data[index] * 0.5 ** (index + 1) for index in range(embedding_size - 1))
+            + last
+        )
 
     def encode_float(self, value: float) -> Iterable:
         if self.embedding_size == 1:
@@ -103,8 +109,7 @@ class AdvancedCoder(KnowledgeCoder):
     def decode_float(self, embedding: Embedding) -> float:
         significant_len = max(self.embedding_size // 2, self.embedding_size - 4)
         vector = [round(x) for x in embedding.data]
-        # vector[significant_len - 1] = embedding.data[significant_len - 1]
-        # vector[-1] = embedding.data[-1]
+        vector[-5] = embedding.data[-5]
         if self.embedding_size == 1:
             return vector[0]
         significant_len = max(self.embedding_size // 2, self.embedding_size - 4)

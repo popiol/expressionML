@@ -14,6 +14,12 @@ class Stats:
             self.count = 0
             self.samples: list[list[float]] = []
 
+    @staticmethod
+    def from_batch(values: list | np.ndarray):
+        stats = Stats()
+        stats.add_batch(values)
+        return stats
+
     def __init__(self):
         self.reset()
 
@@ -48,11 +54,12 @@ class Stats:
     def add_batch(self, values: list | np.ndarray):
         batch_size = len(values)
         self.value_shape = np.shape(values[0])
-        self._stats.mean = (self._stats.mean * self._stats.count + np.mean(values, axis=0) * batch_size) / (
-            self._stats.count + batch_size
-        )
+        self._stats.mean = (
+            self._stats.mean * self._stats.count + np.mean(values, axis=0) * batch_size
+        ) / (self._stats.count + batch_size)
         self._stats.mean_squared = (
-            self._stats.mean_squared * self._stats.count + np.power(values, 2).mean(axis=0) * batch_size
+            self._stats.mean_squared * self._stats.count
+            + np.power(values, 2).mean(axis=0) * batch_size
         ) / (self._stats.count + batch_size)
         self._stats.std = np.power(self._stats.mean_squared - np.power(self._stats.mean, 2), 0.5)
         self._stats.min = np.nanmin([self._stats.min, np.nanmin(values, axis=0)], axis=0)
@@ -77,7 +84,9 @@ class Stats:
                 if len(sample) == 1:
                     if sample * self._stats.samples[0] >= 0:
                         continue
-                elif (sample[-1] - sample[0]) * (self._stats.samples[0][-1] - self._stats.samples[0][0]) >= 0:
+                elif (sample[-1] - sample[0]) * (
+                    self._stats.samples[0][-1] - self._stats.samples[0][0]
+                ) >= 0:
                     continue
             self._stats.samples.append(sample.tolist())
             break

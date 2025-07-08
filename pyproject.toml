@@ -1,11 +1,5 @@
-[tool.black]
-line-length = 130
-
-[tool.isort]
-profile = "black"
-
 [tool.ruff]
-line-length = 130
+line-length = 100
 ignore = [
     "E741"
 ]
