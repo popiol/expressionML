@@ -5,7 +5,7 @@ from functools import cached_property
 
 import numpy as np
 
-from src.keras import keras
+from src.keras import keras, tf
 
 
 @dataclass
@@ -25,19 +25,6 @@ class MlModel:
         print(f"Training model with batch size {len(outputs)}")
         self.model.fit(inputs, outputs, verbose=0, epochs=len(outputs))
 
-    def set_training_mode(self):
-        self.mode = PredictionMode.TRAIN
-        self.model_with_noise = keras.models.clone_model(self.model)
-        weights = self.model.get_weights()
-        for layer in weights:
-            layer += np.random.normal(loc=0.0, scale=0.1, size=layer.shape)
-        assert self.model_with_noise is not None
-        self.model_with_noise.set_weights(weights)
-
-    def set_evaluation_mode(self):
-        self.mode = PredictionMode.EVALUATION
-        self.model_with_noise = None
-
     def clone(self):
         return MlModel(keras.models.clone_model(self.model), self.version)
 
@@ -46,6 +33,28 @@ class MlModel:
         for layer in weights:
             layer += np.random.normal(loc=0.0, scale=0.1, size=layer.shape)
         self.model.set_weights(weights)
+
+
+class FastReluRNN(keras.layers.Layer):
+    def __init__(self, units, **kwargs):
+        super().__init__(**kwargs)
+        self.units = units
+        self.output_dense = keras.layers.Dense(units, activation="relu")
+        self.state_dense = keras.layers.Dense(units, activation="relu")
+
+    def call(self, inputs):
+        batch_size = tf.shape(inputs)[0]
+        outputs = []
+        state = None
+        for i in range(inputs.shape[1]):
+            x = inputs[:, i, :]
+            if state is None:
+                state = tf.zeros((batch_size, self.units), dtype=x.dtype)
+            x_and_state = tf.concat([x, state], axis=-1)
+            out = self.output_dense(x_and_state)
+            outputs.append(tf.expand_dims(out, axis=1))
+            state = self.state_dense(x_and_state)
+        return tf.concat(outputs, axis=1)
 
 
 @dataclass
@@ -97,6 +106,7 @@ class MlModelFactory:
         return keras.Model(inputs=inputs, outputs=l)
 
     def v1(self, input_size: int, output_size: int) -> keras.Model:
+        # score: -0.192, 909s
         inputs = keras.layers.Input(shape=(input_size,))
         l = inputs
         l = keras.layers.Dense(64, activation="relu")(l)
@@ -105,9 +115,10 @@ class MlModelFactory:
         return keras.Model(inputs=inputs, outputs=l)
 
     def v2(self, input_size: int, output_size: int) -> keras.Model:
+        # score:  -0.07788, 993s
         inputs = keras.layers.Input(shape=(input_size,))
         l = inputs
-        for _ in range(2):
+        for _ in range(3):
             l = keras.layers.Dense(64, activation="relu")(l)
             l = keras.layers.Concatenate()([inputs, l])
             l = keras.layers.UnitNormalization()(l)
@@ -115,6 +126,7 @@ class MlModelFactory:
         return keras.Model(inputs=inputs, outputs=l)
 
     def v3(self, input_size: int, output_size: int) -> keras.Model:
+        # score: -0.0147, 983s
         inputs = keras.layers.Input(shape=(input_size,))
         l = inputs
         state = [l]
@@ -129,29 +141,48 @@ class MlModelFactory:
     def v4(self, input_size: int, output_size: int) -> keras.Model:
         inputs = keras.layers.Input(shape=(input_size,))
         l = inputs
-        l = keras.layers.Reshape((3, input_size // 3))(l)[:, :2]
-        l1 = keras.layers.Dense(4)(l)
-        l2 = keras.layers.Dense(1)(l1)
-        l3 = keras.layers.Flatten()(l2)
-        l3 = keras.layers.Dense(1)(l3)
-        l4 = keras.layers.Dense(input_size // 3 - 4)(l)
-        l4 = keras.layers.Flatten()(l4)
-        l = keras.layers.Concatenate()([l3, l4])
-        l5 = keras.layers.Dense(64, activation="relu")(l)
-        l5 = keras.layers.Concatenate()([l3, l5])
-        l5 = keras.layers.Dense(64, activation="relu")(l5)
-        l5 = keras.layers.Dense(64, activation="relu")(l5)
-        l5 = keras.layers.Dense(64, activation="relu")(l5)
-        l6 = keras.layers.Flatten()(l1)
-        l5 = keras.layers.Concatenate()([l6, l5])
-        l = keras.layers.Dense(output_size)(l5)
+        for _ in range(5):
+            state = []
+            for _ in range(4):
+                l1 = keras.layers.Dense(64, activation="relu")(l)
+                l1 = keras.layers.Dense(64, activation="relu")(l1)
+                state.append(l1)
+            l = keras.layers.Concatenate()(state)
+            l = keras.layers.Dense(64, activation="relu")(l)
+        l = keras.layers.Dense(output_size)(l)
         return keras.Model(inputs=inputs, outputs=l)
 
     def v5(self, input_size: int, output_size: int) -> keras.Model:
         inputs = keras.layers.Input(shape=(input_size,))
         l = inputs
-        for _ in range(2):
-            l = keras.layers.Dense(64, activation="softmax")(l)
-            l = keras.layers.Dense(64)(l)
+        l = keras.layers.Reshape((3, 64))(l)
+        l = keras.layers.Permute((2, 1))(l)
+        l = keras.layers.GRU(
+            7,
+            return_sequences=True,
+            go_backwards=True,
+        )(l)
+        l = keras.layers.GRU(
+            4,
+            return_sequences=True,
+            go_backwards=True,
+        )(l)
+        l = keras.layers.GRU(
+            1,
+            return_sequences=True,
+            go_backwards=True,
+        )(l)
+        l = keras.layers.Flatten()(l)
+        l = keras.layers.Dense(output_size)(l)
+        return keras.Model(inputs=inputs, outputs=l)
+
+    def v6(self, input_size: int, output_size: int) -> keras.Model:
+        inputs = keras.layers.Input(shape=(input_size,))
+        l = keras.layers.Reshape((3, 64))(inputs)
+        l = keras.layers.Lambda(lambda x: tf.reverse(x, axis=[-1]))(l)
+        l = keras.layers.Permute((2, 1))(l)
+        for size in [7, 4, 1]:
+            l = FastReluRNN(size)(l)
+        l = keras.layers.Flatten()(l)
         l = keras.layers.Dense(output_size)(l)
         return keras.Model(inputs=inputs, outputs=l)

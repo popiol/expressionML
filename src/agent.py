@@ -21,7 +21,7 @@ class Agent:
     model_factory: MlModelFactory
     knowledge_factory: KnowledgeFactory
     embedding_size: int
-    global_knowledge: KnowledgeService | None
+    global_knowledge: KnowledgeService | None = None
     memory: KnowledgeService | None = None
     _exploration_mode: bool = False
     train_counter: int = 0
@@ -48,6 +48,7 @@ class Agent:
                 input_size=input_format.size,
                 output_size=output_format.size,
             )
+            print(self.models[key].model.summary())
         if self._exploration_mode:
             return self.model_factory.get_model_with_noise(self.models[key])
         return self.models[key]

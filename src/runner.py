@@ -3,8 +3,8 @@ from dataclasses import dataclass
 import numpy as np
 
 from src.agent import Agent
-from src.coder import AdvancedCoder
 from src.dataset import Dataset
+from src.int_coder import IntCoder
 from src.knowledge import KnowledgeFactory, PieceOfKnowledge
 from src.ml_model import MlModelFactory
 from src.stats import Stats
@@ -33,10 +33,10 @@ class Runner:
         print("inputs:", [x.value for x in inputs.data[worst].data])
         print("output:", [x.value for x in outputs.data[worst].data])
         print("action:", [x.value for x in actions.data[worst].data])
+        for x in inputs.data[worst].data:
+            print("input:", x.encoded_value.data)
         print("output", outputs.data[worst].data[0].encoded_value.data)
-        print(
-            "action", [float(round(x, 2)) for x in actions.data[worst].data[0].encoded_value.data]
-        )
+        print("action", [float(round(x)) for x in actions.data[worst].data[0].encoded_value.data])
         return inputs, outputs, actions, scores
 
     def train(self):
@@ -65,7 +65,7 @@ class Runner:
 
 def main():
     embedding_size = 64
-    knowledge_factory = KnowledgeFactory(coder=AdvancedCoder(embedding_size))
+    knowledge_factory = KnowledgeFactory(coder=IntCoder(embedding_size))
     model_factory = MlModelFactory()
     runner = Runner(
         dataset=Dataset(
@@ -73,7 +73,7 @@ def main():
             knowledge_factory=knowledge_factory,
         ),
         agent=Agent(
-            model_version="v2",
+            model_version="v6",
             model_factory=model_factory,
             knowledge_factory=knowledge_factory,
             embedding_size=embedding_size,

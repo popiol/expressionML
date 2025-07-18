@@ -223,18 +223,6 @@ class KnowledgeFactory:
             offset += af.encoded_value_length
         return Knowledge(data)
 
-    def from_decoded_numpy(self, values: np.ndarray, expected_format: KnowledgeFormat) -> Knowledge:
-        data = []
-        for af, value in zip(expected_format.format, values):
-            data.append(
-                AtomicKnowledge.init(
-                    self.coder,
-                    key=af.key,
-                    value=value,
-                )
-            )
-        return Knowledge(data)
-
     def from_format(self, expected_format: KnowledgeFormat) -> Knowledge:
         return Knowledge(
             [

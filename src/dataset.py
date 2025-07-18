@@ -14,9 +14,9 @@ class Dataset:
 
     def arithmetic(self):
         for _ in range(self.batch_size):
-            x = random.random()
-            y = random.random()
-            operation = 0 # random.randrange(2)
+            x = round(random.random() * 1000) / 1000
+            y = round(random.random() * 1000) / 1000
+            operation = 0  # random.randrange(2)
             if operation == 0:
                 result = x + y
             elif operation == 1:
