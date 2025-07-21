@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import cached_property
-
+import math
 import numpy as np
 
 from src.keras import keras, tf
@@ -80,109 +80,84 @@ class MlModelFactory:
         version = ",".join(model.version for model in input_models + [inner_model, output_model])
         return MlModel(raw_model=combined_model, version=version)
 
-    def get_model(self, version: str, input_size: int, output_size: int) -> MlModel:
+    def get_model(self, version: str, in_objects: int, out_objects: int, n_features: int) -> MlModel:
         if version == "v0":
-            model = self.v0(input_size, output_size)
+            model = self.v0(in_objects, out_objects, n_features)
         elif version == "v1":
-            model = self.v1(input_size, output_size)
+            model = self.v1(in_objects, out_objects, n_features)
         elif version == "v2":
-            model = self.v2(input_size, output_size)
+            model = self.v2(in_objects, out_objects, n_features)
         elif version == "v3":
-            model = self.v3(input_size, output_size)
+            model = self.v3(in_objects, out_objects, n_features)
         elif version == "v4":
-            model = self.v4(input_size, output_size)
+            model = self.v4(in_objects, out_objects, n_features)
         elif version == "v5":
-            model = self.v5(input_size, output_size)
+            model = self.v5(in_objects, out_objects, n_features)
         elif version == "v6":
-            model = self.v6(input_size, output_size)
+            model = self.v6(in_objects, out_objects, n_features)
         else:
             raise ValueError(f"Unknown model version: {version}")
         return MlModel(raw_model=model, version=version)
 
-    def v0(self, input_size: int, output_size: int) -> keras.Model:
-        inputs = keras.layers.Input(shape=(input_size,))
-        l = inputs
-        l = keras.layers.Dense(output_size)(l)
+    def v0(self, in_objects: int, out_objects: int, n_features: int) -> keras.Model:
+        inputs = keras.layers.Input(shape=(in_objects, n_features))
+        l = keras.layers.Flatten()(inputs)
+        l = keras.layers.Dense(out_objects * n_features)(l)
+        l = keras.layers.Reshape((out_objects, n_features))(l)
         return keras.Model(inputs=inputs, outputs=l)
 
-    def v1(self, input_size: int, output_size: int) -> keras.Model:
+    def v1(self, in_objects: int, out_objects: int, n_features: int) -> keras.Model:
         # score: -0.192, 909s
-        inputs = keras.layers.Input(shape=(input_size,))
-        l = inputs
+        inputs = keras.layers.Input(shape=(in_objects, n_features))
+        l = keras.layers.Flatten()(inputs)
         l = keras.layers.Dense(64, activation="relu")(l)
         l = keras.layers.Dense(64, activation="relu")(l)
-        l = keras.layers.Dense(output_size)(l)
+        l = keras.layers.Dense(out_objects * n_features)(l)
+        l = keras.layers.Reshape((out_objects, n_features))(l)
         return keras.Model(inputs=inputs, outputs=l)
 
-    def v2(self, input_size: int, output_size: int) -> keras.Model:
+    def v2(self, in_objects: int, out_objects: int, n_features: int) -> keras.Model:
         # score:  -0.07788, 993s
-        inputs = keras.layers.Input(shape=(input_size,))
-        l = inputs
+        inputs = keras.layers.Input(shape=(in_objects, n_features))
+        l = keras.layers.Flatten()(inputs)
         for _ in range(3):
             l = keras.layers.Dense(64, activation="relu")(l)
             l = keras.layers.Concatenate()([inputs, l])
             l = keras.layers.UnitNormalization()(l)
-        l = keras.layers.Dense(output_size)(l)
+        l = keras.layers.Dense(out_objects * n_features)(l)
+        l = keras.layers.Reshape((out_objects, n_features))(l)
         return keras.Model(inputs=inputs, outputs=l)
 
-    def v3(self, input_size: int, output_size: int) -> keras.Model:
+    def v3(self, in_objects: int, out_objects: int, n_features: int) -> keras.Model:
         # score: -0.0147, 983s
-        inputs = keras.layers.Input(shape=(input_size,))
-        l = inputs
+        inputs = keras.layers.Input(shape=(in_objects, n_features))
+        l = keras.layers.Flatten()(inputs)
         state = [l]
         for _ in range(3):
             l = keras.layers.Dense(64, activation="relu")(l)
             state.append(l)
             l = keras.layers.Concatenate()(state)
             l = keras.layers.UnitNormalization()(l)
-        l = keras.layers.Dense(output_size)(l)
+        l = keras.layers.Dense(out_objects * n_features)(l)
+        l = keras.layers.Reshape((out_objects, n_features))(l)
         return keras.Model(inputs=inputs, outputs=l)
 
-    def v4(self, input_size: int, output_size: int) -> keras.Model:
-        inputs = keras.layers.Input(shape=(input_size,))
-        l = inputs
-        for _ in range(5):
-            state = []
-            for _ in range(4):
-                l1 = keras.layers.Dense(64, activation="relu")(l)
-                l1 = keras.layers.Dense(64, activation="relu")(l1)
-                state.append(l1)
-            l = keras.layers.Concatenate()(state)
-            l = keras.layers.Dense(64, activation="relu")(l)
-        l = keras.layers.Dense(output_size)(l)
-        return keras.Model(inputs=inputs, outputs=l)
-
-    def v5(self, input_size: int, output_size: int) -> keras.Model:
-        inputs = keras.layers.Input(shape=(input_size,))
-        l = inputs
-        l = keras.layers.Reshape((3, 64))(l)
+    def v4(self, in_objects: int, out_objects: int, n_features: int) -> keras.Model:
+        inputs = keras.layers.Input(shape=(in_objects, n_features))
+        l = keras.layers.Lambda(lambda x: tf.reverse(x, axis=[-1]))(inputs)
         l = keras.layers.Permute((2, 1))(l)
-        l = keras.layers.GRU(
-            7,
-            return_sequences=True,
-            go_backwards=True,
-        )(l)
-        l = keras.layers.GRU(
-            4,
-            return_sequences=True,
-            go_backwards=True,
-        )(l)
-        l = keras.layers.GRU(
-            1,
-            return_sequences=True,
-            go_backwards=True,
-        )(l)
-        l = keras.layers.Flatten()(l)
-        l = keras.layers.Dense(output_size)(l)
-        return keras.Model(inputs=inputs, outputs=l)
-
-    def v6(self, input_size: int, output_size: int) -> keras.Model:
-        inputs = keras.layers.Input(shape=(input_size,))
-        l = keras.layers.Reshape((3, 64))(inputs)
-        l = keras.layers.Lambda(lambda x: tf.reverse(x, axis=[-1]))(l)
-        l = keras.layers.Permute((2, 1))(l)
-        for size in [7, 4, 1]:
+        for size in [7, 4, out_objects]:
             l = FastReluRNN(size)(l)
-        l = keras.layers.Flatten()(l)
-        l = keras.layers.Dense(output_size)(l)
+        l = keras.layers.Permute((2, 1))(l)
+        return keras.Model(inputs=inputs, outputs=l)
+
+    def v5(self, in_objects: int, out_objects: int, n_features: int) -> keras.Model:
+        inputs = keras.layers.Input(shape=(in_objects, n_features))
+        l = keras.layers.Permute((2, 1))(inputs)
+        n_convs = 10
+        l = keras.layers.ZeroPadding1D(padding=n_convs)(l)
+        for _ in range(n_convs-1):
+            l = keras.layers.Conv1D(10, 3, activation="relu")(l)
+        l = keras.layers.Conv1D(out_objects, 3, activation="relu")(l)
+        l = keras.layers.Permute((2, 1))(l)
         return keras.Model(inputs=inputs, outputs=l)

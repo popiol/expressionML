@@ -9,6 +9,7 @@ from src.knowledge import KnowledgeFactory, PieceOfKnowledge
 from src.ml_model import MlModelFactory
 from src.stats import Stats
 from src.utils import timer
+from src.coder import AdvancedCoder
 
 
 @dataclass
@@ -64,8 +65,11 @@ class Runner:
 
 
 def main():
-    embedding_size = 64
-    knowledge_factory = KnowledgeFactory(coder=IntCoder(embedding_size))
+    knowledge_factory = KnowledgeFactory(
+        coder=AdvancedCoder(
+            embedding_size=64
+        )
+    )
     model_factory = MlModelFactory()
     runner = Runner(
         dataset=Dataset(
@@ -73,10 +77,9 @@ def main():
             knowledge_factory=knowledge_factory,
         ),
         agent=Agent(
-            model_version="v6",
+            model_version="v5",
             model_factory=model_factory,
             knowledge_factory=knowledge_factory,
-            embedding_size=embedding_size,
         ),
         max_iterations=100,
         supervised=True,

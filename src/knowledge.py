@@ -62,6 +62,10 @@ class KnowledgeFormat:
     def size(self) -> int:
         return sum(af.encoded_value_length for af in self.format)
 
+    @property
+    def n_items(self) -> int:
+        return len(self.format)
+
     def __hash__(self):
         return hash(tuple(af.key for af in self.format))
 
@@ -146,7 +150,7 @@ class Knowledge:
         )
 
     def to_numpy(self) -> np.ndarray:
-        return np.concatenate([ak.encoded_value.to_numpy() for ak in self.data])
+        return np.array([ak.encoded_value.to_numpy() for ak in self.data])
 
 
 @dataclass(frozen=True)
@@ -210,8 +214,7 @@ class KnowledgeFactory:
     def from_numpy(self, values: np.ndarray, expected_format: KnowledgeFormat) -> Knowledge:
         data = []
         offset = 0
-        for af in expected_format.format:
-            value = values[offset : offset + af.encoded_value_length]
+        for af, value in zip(expected_format.format, values):
             data.append(
                 AtomicKnowledge.init(
                     self.coder,

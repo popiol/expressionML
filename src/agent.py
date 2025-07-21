@@ -20,7 +20,6 @@ class Agent:
     model_version: str
     model_factory: MlModelFactory
     knowledge_factory: KnowledgeFactory
-    embedding_size: int
     global_knowledge: KnowledgeService | None = None
     memory: KnowledgeService | None = None
     _exploration_mode: bool = False
@@ -45,8 +44,9 @@ class Agent:
         if key not in self.models:
             self.models[key] = self.model_factory.get_model(
                 version=self.model_version,
-                input_size=input_format.size,
-                output_size=output_format.size,
+                in_objects=input_format.n_items,
+                out_objects=output_format.n_items,
+                n_features=self.knowledge_factory.coder.embedding_size,
             )
             print(self.models[key].model.summary())
         if self._exploration_mode:
