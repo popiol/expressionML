@@ -30,15 +30,17 @@ class AdaBoostAgent(Agent):
         print("act")
         assert not inputs.is_empty()
         bad = list(range(expected_format.size))
-        out_array = np.zeros((inputs.size, expected_format.size))
-        classes = np.zeros((inputs.size, 1))
-        for _ in range(4):
+        out_array = np.zeros((inputs.size, expected_format.n_items, expected_format.embedding_size))
+        classes = np.zeros((inputs.size, 1, 1))
+        for level in range(4):
             model = self.get_model(inputs.format, expected_format)
             out_array[bad] = model.predict(inputs.to_numpy()[bad])
             outputs = self.knowledge_factory.from_numpy_batch(out_array, expected_format)
+            if level == 3:
+                break
             classifier = self.get_problem_classifier(inputs.format)
             classes[bad] = classifier.predict(inputs.to_numpy()[bad])
-            bad = [yi for yi, y in enumerate(classes) if y < 0.5]
+            bad = [yi for yi, y in enumerate(classes) if y[0] < 0.5]
             print("# bad", len(bad))
             if not bad:
                 break
@@ -49,8 +51,8 @@ class AdaBoostAgent(Agent):
         print("train agent")
         assert not inputs.is_empty()
         bad = list(range(inputs.size))
-        out_array = np.zeros((inputs.size, outputs.format.size))
-        classes = np.zeros((inputs.size, 1))
+        out_array = np.zeros((inputs.size, outputs.format.n_items, outputs.format.embedding_size))
+        classes = np.zeros((inputs.size, 1, 1))
         for level in range(4):
             if len(self.training_batches) - 1 < level:
                 self.training_batches.append([])
@@ -62,22 +64,28 @@ class AdaBoostAgent(Agent):
             model = self.get_model(inputs.format, outputs.format)
             args = [np.array(x) for x in zip(*training_batch)]
             model.train(args[0], args[1])
+            if level == 3:
+                break
             out_array[bad] = model.predict(inputs.to_numpy()[bad])
             predicted = self.knowledge_factory.from_numpy_batch(out_array, outputs.format)
-            errors = np.array(outputs.distances_to(predicted))[bad]
+            # errors = np.array(outputs.distances_to(predicted))[bad]
+            errors = np.array(
+                [
+                    sum((a.value - b.value) ** 2 for a, b in zip(x.data, y.data)) ** 0.5
+                    for x, y in zip(outputs.data, predicted.data)
+                ]
+            )[bad]
             print("max error", max(errors))
             stats = Stats.from_batch(errors)
             classifier = self.get_problem_classifier(inputs.format)
-            classes[bad] = [[int(error < stats.mean)] for error in errors]
+            classes[bad] = [[[int(error < stats.mean)]] for error in errors]
             for i, (x, y, c) in enumerate(training_batch[-len(bad) :]):
                 c[:] = classes[bad][i]
             args = [np.array(x) for x in zip(*training_batch)]
             classifier.train(args[0], args[2])
             if len(bad) <= 1:
                 break
-            bad = [yi for yi, y in enumerate(classes) if y < 0.5]
+            bad = [yi for yi, y in enumerate(classes) if y[0] < 0.5]
             if not bad:
                 break
             inputs = inputs.merge(predicted)
-            good = [yi for yi, y in enumerate(classes) if y > 0.5]
-            print("sample", outputs.to_numpy()[good[0]])

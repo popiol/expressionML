@@ -3,7 +3,7 @@ from typing import Iterable
 
 from transformers import AutoTokenizer
 
-from src.coder import AdvancedCoder
+from src.coder import FloatCoder
 from src.knowledge import Embedding
 
 
@@ -31,7 +31,7 @@ def decode_integer(vector: tuple[float, ...]) -> int:
     return int(binary_str, 2)
 
 
-class TextCoder(AdvancedCoder):
+class TextCoder(FloatCoder):
     @cached_property
     def tokenizer(self):
         return AutoTokenizer.from_pretrained("google-t5/t5-small")

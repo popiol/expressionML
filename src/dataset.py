@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from src.coder import AdvancedCoder
+from src.coder import FloatCoder
 from src.knowledge import Embedding, KnowledgeFactory, PieceOfKnowledge
 
 
@@ -27,6 +27,22 @@ class Dataset:
                 while abs(y) < 0.001:
                     y = random.random()
                 result = x / y
+            elif operation == 4:
+                result = min(x, y)
+            yield (
+                self.knowledge_factory.from_dict({"x": x, "y": y, "operation": operation}),
+                self.knowledge_factory.from_dict({"result": result}),
+            )
+
+    def chooser(self):
+        for _ in range(self.batch_size):
+            x = round(random.random() * 1000) / 1000
+            y = round(random.random() * 1000) / 1000
+            operation = random.randrange(2)
+            if operation == 0:
+                result = x
+            elif operation == 1:
+                result = y
             yield (
                 self.knowledge_factory.from_dict({"x": x, "y": y, "operation": operation}),
                 self.knowledge_factory.from_dict({"result": result}),
@@ -53,8 +69,18 @@ class Dataset:
                 self.knowledge_factory.from_dict({"result": result}),
             )
 
+    def sign(self):
+        for _ in range(self.batch_size):
+            x = random.randrange(1000)
+            sign = random.randrange(2)
+            result = (sign * 2 - 1) * x
+            yield (
+                self.knowledge_factory.from_dict({"x": x, "sign": sign}),
+                self.knowledge_factory.from_dict({"result": result}),
+            )
+
     def bitwise_operations(self):
-        coder = AdvancedCoder(64)
+        coder = FloatCoder(64)
 
         def to_bits(value):
             return [int(x) for x in coder.encode_float(value)]

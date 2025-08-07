@@ -7,7 +7,7 @@ import numpy as np
 from src.knowledge import Descriptive, Embedding, KnowledgeCoder
 
 
-class AdvancedCoder(KnowledgeCoder):
+class FloatCoder(KnowledgeCoder):
     def encode(self, value: Descriptive) -> Embedding:
         if isinstance(value, str):
             vector = self.encode_text(value)
@@ -109,10 +109,9 @@ class AdvancedCoder(KnowledgeCoder):
     def decode_float(self, embedding: Embedding) -> float:
         significant_len = max(self.embedding_size // 2, self.embedding_size - 4)
         vector = [round(x) for x in embedding.data]
-        vector[-5] = embedding.data[-5]
+        vector[significant_len-1] = embedding.data[significant_len-1]
         if self.embedding_size == 1:
             return vector[0]
-        significant_len = max(self.embedding_size // 2, self.embedding_size - 4)
         encoded1 = vector[:significant_len]
         encoded2 = vector[significant_len:]
         significand = self.decode_binary(Embedding(encoded1))

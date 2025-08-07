@@ -45,8 +45,9 @@ class Agent:
             self.models[key] = self.model_factory.get_model(
                 version=self.model_version,
                 in_objects=input_format.n_items,
+                in_features=input_format.embedding_size,
                 out_objects=output_format.n_items,
-                n_features=self.knowledge_factory.coder.embedding_size,
+                out_features=output_format.embedding_size,
             )
             print(self.models[key].model.summary())
         if self._exploration_mode:

@@ -66,6 +66,10 @@ class KnowledgeFormat:
     def n_items(self) -> int:
         return len(self.format)
 
+    @property
+    def embedding_size(self) -> int:
+        return self.format[0].encoded_value_length
+
     def __hash__(self):
         return hash(tuple(af.key for af in self.format))
 

@@ -1,10 +1,10 @@
 from typing import Iterable
 
-from src.coder import AdvancedCoder
+from src.coder import FloatCoder
 from src.knowledge import Embedding
 
 
-class IntCoder(AdvancedCoder):
+class IntCoder(FloatCoder):
     def encode_integer(self, value: int) -> Iterable:
         return format(value, "b")
 

@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from src.coder import AdvancedCoder
+from src.coder import FloatCoder
 
-coders = [AdvancedCoder(i) for i in [64]]
+coders = [FloatCoder(i) for i in [64]]
 
 
 @pytest.mark.parametrize("coder", coders)

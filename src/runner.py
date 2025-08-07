@@ -3,13 +3,12 @@ from dataclasses import dataclass
 import numpy as np
 
 from src.agent import Agent
+from src.coder import FloatCoder
 from src.dataset import Dataset
-from src.int_coder import IntCoder
 from src.knowledge import KnowledgeFactory, PieceOfKnowledge
 from src.ml_model import MlModelFactory
 from src.stats import Stats
 from src.utils import timer
-from src.coder import AdvancedCoder
 
 
 @dataclass
@@ -45,6 +44,10 @@ class Runner:
         if self.supervised:
             inputs, outputs, actions, scores = self.simulate()
             self.agent.train(inputs, outputs)
+            bad = sorted(range(len(scores)), key=lambda i: scores[i])[: len(scores) // 2]
+            bad_inputs = PieceOfKnowledge(list(np.array(inputs.data)[bad]))
+            bad_outputs = PieceOfKnowledge(list(np.array(outputs.data)[bad]))
+            self.agent.train(bad_inputs, bad_outputs)
         else:
             with self.agent.exploration_mode():
                 inputs, outputs, actions, scores = self.simulate()
@@ -65,11 +68,7 @@ class Runner:
 
 
 def main():
-    knowledge_factory = KnowledgeFactory(
-        coder=AdvancedCoder(
-            embedding_size=64
-        )
-    )
+    knowledge_factory = KnowledgeFactory(coder=FloatCoder(embedding_size=64))
     model_factory = MlModelFactory()
     runner = Runner(
         dataset=Dataset(
