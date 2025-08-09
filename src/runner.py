@@ -4,6 +4,7 @@ import numpy as np
 
 from src.agent import Agent
 from src.coder import FloatCoder
+from src.int_coder import IntCoder
 from src.dataset import Dataset
 from src.knowledge import KnowledgeFactory, PieceOfKnowledge
 from src.ml_model import MlModelFactory
@@ -44,10 +45,15 @@ class Runner:
         if self.supervised:
             inputs, outputs, actions, scores = self.simulate()
             self.agent.train(inputs, outputs)
-            bad = sorted(range(len(scores)), key=lambda i: scores[i])[: len(scores) // 2]
-            bad_inputs = PieceOfKnowledge(list(np.array(inputs.data)[bad]))
-            bad_outputs = PieceOfKnowledge(list(np.array(outputs.data)[bad]))
-            self.agent.train(bad_inputs, bad_outputs)
+            # new_actions = self.agent.act(inputs, outputs.format)
+            # new_scores = self.evaluate(new_actions, outputs)
+            # new_inputs, new_outputs = self.agent.acknowledge_training_feedback(
+            #     inputs, outputs, new_scores
+            # )
+            # new_actions = self.agent.act(new_inputs, outputs.format)
+            # new_scores = self.evaluate(new_actions, new_outputs)
+            # stats = Stats.from_batch(new_scores)
+            # print(f"Train score: {stats.mean}, {stats.min}, {stats.count}")
         else:
             with self.agent.exploration_mode():
                 inputs, outputs, actions, scores = self.simulate()

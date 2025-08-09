@@ -5,6 +5,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import cached_property
 
+import numpy as np
+
 from src.knowledge import (
     Knowledge,
     KnowledgeFactory,
@@ -31,6 +33,10 @@ class Agent:
 
     @cached_property
     def training_batch(self) -> list[tuple[float, Knowledge, Knowledge]]:
+        return []
+
+    @cached_property
+    def retraining_batch(self) -> list[tuple[float, Knowledge, Knowledge]]:
         return []
 
     @contextmanager
@@ -62,11 +68,24 @@ class Agent:
             model.predict(inputs.to_numpy()), expected_format
         )
 
-    def train(self, inputs: PieceOfKnowledge, outputs: PieceOfKnowledge):
+    def train(
+        self, inputs: PieceOfKnowledge, outputs: PieceOfKnowledge, epochs_multiplier: int = 1
+    ):
         print("train agent")
         assert not inputs.is_empty()
         model = self.get_model(inputs.format, outputs.format)
-        model.train(inputs.to_numpy(), outputs.to_numpy())
+        model.train(inputs.to_numpy(), outputs.to_numpy(), epochs_multiplier=epochs_multiplier)
+
+    def acknowledge_training_feedback(
+        self, inputs: PieceOfKnowledge, outputs: PieceOfKnowledge, scores: list[float]
+    ):
+        worst = np.argmin(scores)
+        print("worst input:", [x.value for x in inputs.data[worst].data])
+        print("worst output:", [x.value for x in outputs.data[worst].data])
+        self.retraining_batch.append((inputs.data[worst], outputs.data[worst]))
+        new_inputs, new_outputs = [PieceOfKnowledge(x) for x in zip(*self.retraining_batch)]
+        self.train(new_inputs, new_outputs, epochs_multiplier=100 // len(self.retraining_batch) + 1)
+        return new_inputs, new_outputs
 
     def acknowledge_feedback(
         self, inputs: PieceOfKnowledge, actions: PieceOfKnowledge, scores: list[float]

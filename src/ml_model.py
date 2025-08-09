@@ -21,9 +21,15 @@ class MlModel:
     def predict(self, inputs: np.ndarray) -> np.ndarray:
         return self.model.predict(inputs, verbose=0)
 
-    def train(self, inputs: np.ndarray, outputs: np.ndarray):
+    def train(self, inputs: np.ndarray, outputs: np.ndarray, epochs_multiplier: int = 1):
         print(f"Training model with batch size {len(outputs)}")
-        self.model.fit(inputs, outputs, verbose=0, epochs=len(outputs))
+        self.model.fit(
+            inputs,
+            outputs,
+            verbose=0,
+            epochs=len(outputs) * epochs_multiplier,
+            callbacks=[keras.callbacks.EarlyStopping(monitor="loss", patience=3)],
+        )
 
     def clone(self):
         return MlModel(keras.models.clone_model(self.model), self.version)
@@ -114,7 +120,6 @@ class MlModelFactory:
     def v1(
         self, in_objects: int, in_features: int, out_objects: int, out_features: int
     ) -> keras.Model:
-        # score: -0.192, 909s
         inputs = keras.layers.Input(shape=(in_objects, in_features))
         l = keras.layers.Flatten()(inputs)
         for index in range(5):
@@ -127,7 +132,6 @@ class MlModelFactory:
     def v2(
         self, in_objects: int, in_features: int, out_objects: int, out_features: int
     ) -> keras.Model:
-        # score:  -0.07788, 993s
         inputs = keras.layers.Input(shape=(in_objects, in_features))
         l = keras.layers.Flatten()(inputs)
         l1 = l
@@ -142,7 +146,6 @@ class MlModelFactory:
     def v3(
         self, in_objects: int, in_features: int, out_objects: int, out_features: int
     ) -> keras.Model:
-        # score: -0.0147, 983s
         inputs = keras.layers.Input(shape=(in_objects, in_features))
         l = keras.layers.Flatten()(inputs)
         state = [l]
@@ -160,7 +163,7 @@ class MlModelFactory:
     ) -> keras.Model:
         inputs = keras.layers.Input(shape=(in_objects, in_features))
         l = keras.layers.Permute((2, 1))(inputs)
-        n_convs = 10
+        n_convs = 20
         l = keras.layers.ZeroPadding1D(padding=n_convs)(l)
         for _ in range(n_convs - 1):
             l = keras.layers.Conv1D(10, 3, activation="relu")(l)
@@ -184,14 +187,26 @@ class MlModelFactory:
                     l = keras.layers.Dense(out_features)(l)
                 break
             l = keras.layers.Dense(in_objects, activation="relu")(l)
-            lpad = index % in_objects
-            rpad = (-lpad - in_features) % in_objects
-            l = keras.layers.ZeroPadding1D(padding=(lpad, rpad))(l)
+            # offset = in_objects * in_features
+            # lpad = index % offset
+            # rpad = (-lpad - in_features) % offset
+            # l = keras.layers.ZeroPadding1D(padding=(lpad, rpad))(l)
             l = keras.layers.Permute((2, 1))(l)
-            l = keras.layers.Reshape((in_features + lpad + rpad, -1))(l)
-            l = keras.layers.Dense(in_objects, activation="relu")(l)
-            l = keras.layers.Reshape((-1, in_features + lpad + rpad))(l)
-            l = l[:, :, lpad : in_features + lpad]
+            state.append(l)
+            l = keras.layers.Concatenate(axis=-2)(state)
+            state_size = l.shape[-1]
+            offset = 3
+            lpad = index % offset
+            rpad = (-lpad - l.shape[-2]) % offset
+            l = keras.layers.ZeroPadding1D(padding=(lpad, rpad))(l)
+            l = keras.layers.Reshape((-1, in_features, 3))(l)
+            l = keras.layers.Permute((2, 1, 3))(l)
+            l = keras.layers.Reshape((in_features, -1))(l)
+            l = keras.layers.Dense(3, activation="relu")(l)
+            l = keras.layers.Reshape((in_features, -1, 3))(l)
+            l = keras.layers.Permute((2, 1, 3))(l)
+            l = keras.layers.Reshape((-1, in_features))(l)
+            l = l[:, lpad:lpad+state_size, :]
             state.append(l)
             l = keras.layers.Concatenate(axis=-2)(state)
         return keras.Model(inputs=inputs, outputs=l)

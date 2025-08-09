@@ -13,9 +13,24 @@ class Dataset:
     knowledge_factory: KnowledgeFactory
 
     def arithmetic(self):
+        # random.seed(0)
         for _ in range(self.batch_size):
             x = round(random.random() * 1000) / 1000
             y = round(random.random() * 1000) / 1000
+            # for x, y in [
+            #     (0.671, 0.692),
+            #     (0.882, 0.923),
+            #     (0.043, 0.538),
+            #     (0.039, 0.035),
+            #     (0.975, 0.42),
+            #     (0.924, 0.43),
+            #     (0.353, 0.937),
+            #     (0.998, 0.366),
+            #     (0.728, 0.003),
+            #     (0.598, 0.354),
+            #     (0.365, 0.692),
+            #     (0.624, 0.278),
+            # ]:
             operation = 0  # random.randrange(2)
             if operation == 0:
                 result = x + y
