@@ -53,14 +53,15 @@ class TrainableMask(keras.layers.Layer):
 
 
 class PadLastDimLayer(keras.layers.Layer):
-    def __init__(self, pad_width, **kwargs):
+    def __init__(self, lpad, rpad, **kwargs):
         super().__init__(**kwargs)
-        self.pad_width = pad_width
+        self.lpad = lpad
+        self.rpad = rpad
 
     def call(self, inputs):
-        # Pad zeros at the end of the last dimension
         paddings = [[0, 0] for _ in range(len(inputs.shape))]
-        paddings[-1][0] = self.pad_width
+        paddings[-1][0] = self.lpad
+        paddings[-1][1] = self.rpad
         return tf.pad(inputs, paddings)
 
 
@@ -176,37 +177,27 @@ class MlModelFactory:
     ) -> keras.Model:
         inputs = keras.layers.Input(shape=(in_objects, in_features))
         l = inputs
-        iterations = 10
+        l = keras.layers.Flatten()(l)
+        iterations = 20
         state = [l]
+        max_state_size = 10
+        offset = in_features * in_objects // 9 * 3
         for index in range(iterations):
-            l = keras.layers.Permute((2, 1))(l)
-            if index == iterations - 1:
-                l = keras.layers.Dense(out_objects)(l)
-                l = keras.layers.Permute((2, 1))(l)
-                if in_features != out_features:
-                    l = keras.layers.Dense(out_features)(l)
-                break
-            l = keras.layers.Dense(in_objects, activation="relu")(l)
-            # offset = in_objects * in_features
-            # lpad = index % offset
-            # rpad = (-lpad - in_features) % offset
-            # l = keras.layers.ZeroPadding1D(padding=(lpad, rpad))(l)
-            l = keras.layers.Permute((2, 1))(l)
-            state.append(l)
-            l = keras.layers.Concatenate(axis=-2)(state)
-            state_size = l.shape[-1]
-            offset = 3
-            lpad = index % offset
-            rpad = (-lpad - l.shape[-2]) % offset
-            l = keras.layers.ZeroPadding1D(padding=(lpad, rpad))(l)
-            l = keras.layers.Reshape((-1, in_features, 3))(l)
+            l = PadLastDimLayer(-l.shape[-1] % offset, 0)(l)
+            l = keras.layers.Reshape((-1, offset // 3, 3))(l)
             l = keras.layers.Permute((2, 1, 3))(l)
-            l = keras.layers.Reshape((in_features, -1))(l)
+            l = keras.layers.Reshape((offset // 3, -1))(l)
             l = keras.layers.Dense(3, activation="relu")(l)
-            l = keras.layers.Reshape((in_features, -1, 3))(l)
+            l = keras.layers.Reshape((offset // 3, -1, 3))(l)
             l = keras.layers.Permute((2, 1, 3))(l)
-            l = keras.layers.Reshape((-1, in_features))(l)
-            l = l[:, lpad:lpad+state_size, :]
+            l = keras.layers.Flatten()(l)
             state.append(l)
-            l = keras.layers.Concatenate(axis=-2)(state)
+            if len(state) > max_state_size:
+                state = state[-max_state_size:]
+            l = keras.layers.Concatenate()(state)
+        l = PadLastDimLayer(-l.shape[-1] % out_features, 0)(l)
+        l = keras.layers.Reshape((-1, out_features))(l)
+        l = keras.layers.Permute((2, 1))(l)
+        l = keras.layers.Dense(out_objects)(l)
+        l = keras.layers.Permute((2, 1))(l)
         return keras.Model(inputs=inputs, outputs=l)

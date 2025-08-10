@@ -4,7 +4,6 @@ import numpy as np
 
 from src.agent import Agent
 from src.coder import FloatCoder
-from src.int_coder import IntCoder
 from src.dataset import Dataset
 from src.knowledge import KnowledgeFactory, PieceOfKnowledge
 from src.ml_model import MlModelFactory
