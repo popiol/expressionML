@@ -58,13 +58,13 @@ class Runner:
                 inputs, outputs, actions, scores = self.simulate()
             self.agent.acknowledge_feedback(inputs, actions, scores)
         stats = Stats.from_batch(scores)
-        print(f"Train score: {stats.mean}, {stats.min}")
+        print(f"Train score: {stats.mean}, {stats.min}, {stats.max}")
 
     def test(self):
         print("test")
         inputs, outputs, actions, scores = self.simulate()
         stats = Stats.from_batch(scores)
-        print(f"Test score: {stats.mean}, {stats.min}")
+        print(f"Test score: {stats.mean}, {stats.min}, {stats.max}")
 
     def run(self):
         for _ in range(self.max_iterations):

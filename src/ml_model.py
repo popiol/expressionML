@@ -15,7 +15,7 @@ class MlModel:
 
     @cached_property
     def model(self) -> keras.Model:
-        self.raw_model.compile(optimizer="adam", loss="mse")
+        self.raw_model.compile(optimizer="adam", loss="huber")
         return self.raw_model
 
     def predict(self, inputs: np.ndarray) -> np.ndarray:
@@ -164,7 +164,7 @@ class MlModelFactory:
     ) -> keras.Model:
         inputs = keras.layers.Input(shape=(in_objects, in_features))
         l = keras.layers.Permute((2, 1))(inputs)
-        n_convs = 20
+        n_convs = 10
         l = keras.layers.ZeroPadding1D(padding=n_convs)(l)
         for _ in range(n_convs - 1):
             l = keras.layers.Conv1D(10, 3, activation="relu")(l)
@@ -180,15 +180,16 @@ class MlModelFactory:
         l = keras.layers.Flatten()(l)
         iterations = 20
         state = [l]
-        max_state_size = 10
-        offset = in_features * in_objects // 9 * 3
+        max_state_size = 5
+        base = 9
+        offset = out_features // base
         for index in range(iterations):
-            l = PadLastDimLayer(-l.shape[-1] % offset, 0)(l)
-            l = keras.layers.Reshape((-1, offset // 3, 3))(l)
+            l = PadLastDimLayer(-l.shape[-1] % (offset * base), 0)(l)
+            l = keras.layers.Reshape((-1, offset, base))(l)
             l = keras.layers.Permute((2, 1, 3))(l)
-            l = keras.layers.Reshape((offset // 3, -1))(l)
-            l = keras.layers.Dense(3, activation="relu")(l)
-            l = keras.layers.Reshape((offset // 3, -1, 3))(l)
+            l = keras.layers.Reshape((offset, -1))(l)
+            l = keras.layers.Dense(base, activation="relu")(l)
+            l = keras.layers.Reshape((offset, -1, base))(l)
             l = keras.layers.Permute((2, 1, 3))(l)
             l = keras.layers.Flatten()(l)
             state.append(l)
@@ -199,5 +200,26 @@ class MlModelFactory:
         l = keras.layers.Reshape((-1, out_features))(l)
         l = keras.layers.Permute((2, 1))(l)
         l = keras.layers.Dense(out_objects)(l)
+        l = keras.layers.Permute((2, 1))(l)
+        return keras.Model(inputs=inputs, outputs=l)
+
+    def v6(
+        self, in_objects: int, in_features: int, out_objects: int, out_features: int
+    ) -> keras.Model:
+        inputs = keras.layers.Input(shape=(in_objects, in_features))
+        l = keras.layers.Permute((2, 1))(inputs)
+        n_convs = 20
+        state = [l]
+        max_state_size = 5
+        base = 3
+        for _ in range(n_convs - 1):
+            l = keras.layers.ZeroPadding1D(padding=1)(l)
+            l = keras.layers.Conv1D(base, 3, activation="relu")(l)
+            state.append(l)
+            if len(state) > max_state_size:
+                state = state[-max_state_size:]
+            l = keras.layers.Concatenate()(state)
+        l = keras.layers.ZeroPadding1D(padding=1)(l)
+        l = keras.layers.Conv1D(out_objects, 3, activation="relu")(l)
         l = keras.layers.Permute((2, 1))(l)
         return keras.Model(inputs=inputs, outputs=l)
