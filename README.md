@@ -1,2 +1,2 @@
 # expressionML
-Attempt to teach an ML model do arithmetic
+Attempt to teach an ML model do binary arithmetic
