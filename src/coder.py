@@ -56,7 +56,7 @@ class FloatCoder(KnowledgeCoder):
     def decode_integer(self, embedding: Embedding) -> int:
         return round(self.decode_float(embedding))
 
-    def encode_small_integer(self, value: int, embedding_size: int | None = None) -> Iterable:
+    def encode_small_integer(self, value: int, embedding_size: int | None = None) -> list[float]:
         sign = int(np.sign(value))
         value = abs(value)
         result = format(value, "b")
@@ -78,7 +78,7 @@ class FloatCoder(KnowledgeCoder):
             result = result * 2 + val
         return int(result)
 
-    def encode_binary(self, value: float, embedding_size: int | None = None) -> Iterable:
+    def encode_binary(self, value: float, embedding_size: int | None = None) -> list[float]:
         """Encodes numbers from [-1, 1]"""
         embedding_size = embedding_size if embedding_size else self.embedding_size
         x = value
@@ -89,7 +89,7 @@ class FloatCoder(KnowledgeCoder):
         result.append(x - int(x))
         return result
 
-    def decode_binary(self, embedding: Embedding) -> int:
+    def decode_binary(self, embedding: Embedding) -> float:
         embedding_size = len(embedding.data)
         last = embedding.data[embedding_size - 1] * 0.5 ** (embedding_size - 1)
         return (
@@ -108,7 +108,7 @@ class FloatCoder(KnowledgeCoder):
 
     def decode_float(self, embedding: Embedding) -> float:
         significant_len = max(self.embedding_size // 2, self.embedding_size - 4)
-        vector = [round(x) for x in embedding.data]
+        vector: list[float] = [round(x) for x in embedding.data]
         vector[significant_len-1] = embedding.data[significant_len-1]
         if self.embedding_size == 1:
             return vector[0]

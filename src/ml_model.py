@@ -15,7 +15,7 @@ class MlModel:
 
     @cached_property
     def model(self) -> keras.Model:
-        self.raw_model.compile(optimizer="adam", loss="huber")
+        self.raw_model.compile(optimizer=keras.optimizers.Adam(0.0005), loss="mse")
         return self.raw_model
 
     def predict(self, inputs: np.ndarray) -> np.ndarray:
@@ -27,7 +27,7 @@ class MlModel:
             inputs,
             outputs,
             verbose=0,
-            epochs=len(outputs) * epochs_multiplier,
+            epochs=min(100, len(outputs) * epochs_multiplier),
             callbacks=[keras.callbacks.EarlyStopping(monitor="loss", patience=3)],
         )
 
@@ -208,11 +208,21 @@ class MlModelFactory:
     ) -> keras.Model:
         inputs = keras.layers.Input(shape=(in_objects, in_features))
         l = keras.layers.Permute((2, 1))(inputs)
-        n_convs = 20
+        n_convs = 15
         state = [l]
-        max_state_size = 5
-        base = 3
+        max_state_size = 3
+        base = 9
+        l = keras.layers.Dropout(0.5)(l)
         for _ in range(n_convs - 1):
+            l1 = l
+            l = keras.layers.Dense(1)(l)
+            l = keras.layers.Permute((2, 1))(l)
+            l = keras.layers.Dense(1)(l)
+            l = keras.layers.Dense(in_features)(l)
+            l = keras.layers.Permute((2, 1))(l)
+            state.append(l)
+            l = l1
+
             l = keras.layers.ZeroPadding1D(padding=1)(l)
             l = keras.layers.Conv1D(base, 3, activation="relu")(l)
             state.append(l)
@@ -220,6 +230,6 @@ class MlModelFactory:
                 state = state[-max_state_size:]
             l = keras.layers.Concatenate()(state)
         l = keras.layers.ZeroPadding1D(padding=1)(l)
-        l = keras.layers.Conv1D(out_objects, 3, activation="relu")(l)
+        l = keras.layers.Conv1D(out_objects, 3)(l)
         l = keras.layers.Permute((2, 1))(l)
         return keras.Model(inputs=inputs, outputs=l)

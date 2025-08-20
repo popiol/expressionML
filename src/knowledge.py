@@ -11,11 +11,11 @@ FLOAT_TYPE = np.float32
 
 @dataclass
 class Embedding:
-    data: tuple[float, ...]
+    data: list[float]
 
     @staticmethod
     def from_numpy(array: np.ndarray) -> Embedding:
-        return Embedding(tuple(array.flatten().tolist()))
+        return Embedding(array.flatten().tolist())
 
     def to_numpy(self) -> np.ndarray:
         return np.array(self.data, dtype=FLOAT_TYPE)
@@ -28,10 +28,10 @@ class KnowledgeCoder:
     def encode(self, value: Descriptive) -> Embedding:
         if isinstance(value, str):
             return Embedding(
-                tuple(ord(c) for c in value.ljust(self.embedding_size)[: self.embedding_size])
+                list(ord(c) for c in value.ljust(self.embedding_size)[: self.embedding_size])
             )
         elif isinstance(value, (int, float)):
-            return Embedding(tuple([float(value)] + [0.0] * (self.embedding_size - 1)))
+            return Embedding([float(value)] + [0.0] * (self.embedding_size - 1))
 
     def decode(self, embedding: Embedding, output_type: type[Descriptive]) -> Descriptive:
         if output_type is str:
@@ -80,15 +80,31 @@ class AtomicKnowledge:
 
     @cached_property
     def key(self):
-        return self.coder.decode(self.encoded_key)
+        return self.coder.decode(self.encoded_key, self.key_type)
 
     @cached_property
     def value(self):
         return self.coder.decode(self.encoded_value, self.value_type)
 
     @cached_property
+    def key_type(self):
+        if isinstance(self.key, str):
+            return str
+        elif isinstance(self.key, int):
+            return int
+        elif isinstance(self.key, float):
+            return float
+        raise ValueError(f"Unsupported type for key: {type(self.key)}")
+
+    @cached_property
     def value_type(self):
-        return type(self.value)
+        if isinstance(self.value, str):
+            return str
+        elif isinstance(self.value, int):
+            return int
+        elif isinstance(self.value, float):
+            return float
+        raise ValueError(f"Unsupported type for value: {type(self.value)}")
 
     @cached_property
     def encoded_key(self):
@@ -102,12 +118,14 @@ class AtomicKnowledge:
     def init(
         coder: KnowledgeCoder,
         key: Descriptive | None = None,
+        key_type: type[Descriptive] | None = None,
         value: Descriptive | None = None,
         value_type: type[Descriptive] | None = None,
         encoded_key: Embedding | None = None,
         encoded_value: Embedding | None = None,
     ):
         ak = AtomicKnowledge(coder)
+        assert key is not None or key_type is not None
         if key is not None:
             ak.key = key
         assert value is not None or value_type is not None
@@ -237,7 +255,7 @@ class KnowledgeFactory:
                     self.coder,
                     key=af.key,
                     value_type=af.value_type,
-                    encoded_value=Embedding(np.zeros(af.encoded_value_length)),
+                    encoded_value=Embedding(np.zeros(af.encoded_value_length).tolist()),
                 )
                 for af in expected_format.format
             ]

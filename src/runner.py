@@ -77,15 +77,15 @@ def main():
     model_factory = MlModelFactory()
     runner = Runner(
         dataset=Dataset(
-            batch_size=100,
+            batch_size=500,
             knowledge_factory=knowledge_factory,
         ),
         agent=Agent(
-            model_version="v5",
+            model_version="v6",
             model_factory=model_factory,
             knowledge_factory=knowledge_factory,
         ),
-        max_iterations=100,
+        max_iterations=1000,
         supervised=True,
     )
     runner.run()
