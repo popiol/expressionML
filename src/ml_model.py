@@ -105,6 +105,8 @@ class MlModelFactory:
             model = self.v5(in_objects, in_features, out_objects, out_features)
         elif version == "v6":
             model = self.v6(in_objects, in_features, out_objects, out_features)
+        elif version == "v7":
+            model = self.v7(in_objects, in_features, out_objects, out_features)
         else:
             raise ValueError(f"Unknown model version: {version}")
         return MlModel(raw_model=model, version=version)
@@ -123,9 +125,8 @@ class MlModelFactory:
     ) -> keras.Model:
         inputs = keras.layers.Input(shape=(in_objects, in_features))
         l = keras.layers.Flatten()(inputs)
-        for index in range(5):
-            size = 2 ** (10 - index)
-            l = keras.layers.Dense(size, activation="relu")(l)
+        for _ in range(2):
+            l = keras.layers.Dense(64, activation="relu")(l)
         l = keras.layers.Dense(out_objects * out_features)(l)
         l = keras.layers.Reshape((out_objects, out_features))(l)
         return keras.Model(inputs=inputs, outputs=l)
@@ -232,4 +233,16 @@ class MlModelFactory:
         l = keras.layers.ZeroPadding1D(padding=1)(l)
         l = keras.layers.Conv1D(out_objects, 3)(l)
         l = keras.layers.Permute((2, 1))(l)
+        return keras.Model(inputs=inputs, outputs=l)
+
+    def v7(
+        self, in_objects: int, in_features: int, out_objects: int, out_features: int
+    ) -> keras.Model:
+        inputs = keras.layers.Input(shape=(in_objects, in_features))
+        l = keras.layers.Dense(2)(inputs)
+        l = keras.layers.Flatten()(l)
+        for _ in range(2):
+            l = keras.layers.Dense(64, activation="relu")(l)
+        l = keras.layers.Dense(out_objects * out_features)(l)
+        l = keras.layers.Reshape((out_objects, out_features))(l)
         return keras.Model(inputs=inputs, outputs=l)

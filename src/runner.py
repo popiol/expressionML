@@ -81,7 +81,7 @@ def main():
             knowledge_factory=knowledge_factory,
         ),
         agent=Agent(
-            model_version="v6",
+            model_version="v7",
             model_factory=model_factory,
             knowledge_factory=knowledge_factory,
         ),
